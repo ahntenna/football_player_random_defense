@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070d18">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+<title>축구 선수 랜덤 디펜스</title>
+<meta name="description" content="The Guardian 2025 세계 축구 선수 TOP 50을 영입해 원정 군단을 막아내는 랜덤 디펜스 게임">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═════════ 타이틀 ═════════ -->
+  <section id="title" class="screen">
+    <canvas id="titleBg" aria-hidden="true"></canvas>
+    <canvas id="titleFx" class="hidden" aria-hidden="true"></canvas>
+    <div class="title-shade"></div>
+    <div class="title-wrap">
+      <div class="title-left">
+        <div class="kicker">THE GUARDIAN TOP 50 · 2025 EDITION</div>
+        <h1 class="logo"><span>축구 선수</span><span class="accent">랜덤 디펜스</span></h1>
+        <p class="tagline">세계 최고의 선수 50인을 영입해 원정 군단을 막아라.<br>운이 좋다면 <b>메시 · 호날두 · 펠레 · 마라도나 · 베켄바우어</b>가 찾아온다.</p>
+        <div class="menu">
+          <div class="menu-row">
+            <label for="difficulty">난이도</label>
+            <select id="difficulty">
+              <option value="easy">아마추어 (쉬움)</option>
+              <option value="normal" selected>프로 (보통)</option>
+              <option value="hard">월드클래스 (어려움)</option>
+              <option value="nightmare">레전드 (지옥)</option>
+            </select>
+          </div>
+          <div class="menu-row">
+            <span class="lbl">모드</span>
+            <div class="seg" id="modeSeg">
+              <button type="button" data-mode="normal" class="on">정규 40웨이브</button>
+              <button type="button" data-mode="infinite" id="modeInfinite">무한 모드 🔒</button>
+            </div>
+          </div>
+          <button type="button" id="btnStart" class="btn primary big">⚽ 킥오프 · 새 경기</button>
+          <button type="button" id="btnContinue" class="btn big hidden">▶ 이어하기 <small id="continueInfo"></small></button>
+          <div class="menu-grid">
+            <button type="button" class="btn" data-open="codex">📖 선수 도감</button>
+            <button type="button" class="btn" data-open="relics">🏆 트로피 캐비닛</button>
+            <button type="button" class="btn" data-open="records">📊 기록실</button>
+            <button type="button" class="btn" data-open="help">❓ 게임 방법</button>
+            <button type="button" class="btn" data-open="settings">⚙️ 설정</button>
+            <button type="button" class="btn" data-open="credits">📷 사진 출처</button>
+          </div>
+          <div class="title-meta" id="titleMeta"></div>
+        </div>
+      </div>
+      <div class="title-right" id="titleCollage" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <!-- ═════════ 게임 ═════════ -->
+  <section id="game" class="screen hidden">
+    <header class="hud">
+      <div class="brand">⚽ <b>FPRD</b></div>
+      <div class="hud-cell">
+        <span class="lbl" id="hudMode">정규 · 프로</span>
+        <span class="big"><b id="hudWave">00</b><small id="hudWaveMax">/ 40</small></span>
+      </div>
+      <div class="hud-cell grow">
+        <span class="lbl">경기장 적 <b id="hudEnemies">0</b> / 150 <em>· 150명 초과 시 패배</em></span>
+        <div class="bar"><i id="hudEnemyBar"></i></div>
+      </div>
+      <div class="hud-cell"><span class="lbl">남은 적</span><span class="big" id="hudRemain">0</span></div>
+      <div class="hud-cell"><span class="lbl" id="hudTimeLbl">경기 시간</span><span class="big" id="hudTime">00:00</span></div>
+      <div class="hud-cell boss hidden" id="hudBoss"><span class="lbl">보스 제한</span><span class="big" id="hudBossTime">120</span></div>
+      <div class="speed">
+        <button type="button" data-speed="1" class="on" title="1배속 (1)">1×</button>
+        <button type="button" data-speed="2" title="2배속 (2)">2×</button>
+        <button type="button" data-speed="3" title="3배속 (3)">3×</button>
+        <button type="button" id="btnPause" title="일시정지 (Space)">❚❚</button>
+        <button type="button" id="btnMenu" title="메뉴 (Esc)">☰</button>
+      </div>
+    </header>
+
+    <main class="board">
+      <aside class="panel left">
+        <div class="card" id="waveCard"></div>
+        <div class="card event-card hidden" id="eventCard"></div>
+        <div class="card" id="squadCard"></div>
+        <div class="card" id="statCard"></div>
+        <div class="card" id="logCard"></div>
+      </aside>
+
+      <div class="field-wrap">
+        <div class="field" id="field">
+          <canvas id="bgCanvas"></canvas>
+          <canvas id="fxCanvas"></canvas>
+          <div class="kickoff hidden" id="kickoff"><button type="button" id="btnKickoff">⚽ 킥오프! <b id="kickoffTime">20</b>초</button><small>선수를 영입해 트랙 가까이 배치하세요</small></div>
+          <div class="toasts" id="toasts"></div>
+          <div class="banner" id="banner"></div>
+          <div class="reveal hidden" id="reveal"></div>
+          <div class="paused hidden" id="pausedMask"><b>일시정지</b><small>Space 또는 ❚❚ 로 계속</small></div>
+        </div>
+        <div class="field-hint">선수 클릭: 정보 · 드래그: 이동/교체 · 단축키 Q 영입 · W 10회 · E 합성 · Space 일시정지</div>
+      </div>
+
+      <aside class="panel right">
+        <div class="card" id="missionCard"></div>
+        <div class="card incident-card hidden" id="incidentCard"></div>
+        <div class="card">
+          <div class="card-h">조합 가능 <small>클릭 시 즉시 조합</small></div>
+          <div id="quickCraft" class="quick"></div>
+        </div>
+        <div class="card profile" id="profileCard"></div>
+      </aside>
+    </main>
+
+    <footer class="actions">
+      <div class="wallet">
+        <div class="gold"><span>🪙</span><b id="gold">0</b><small>골드</small></div>
+        <div class="tickets" title="영입권: 골드 대신 먼저 사용됩니다"><span>🎟️</span><b id="tickets">0</b><small>영입권</small></div>
+      </div>
+      <button type="button" class="act primary" id="actSummon"><b>영입 1회</b><small id="summonCostLbl">45 골드</small></button>
+      <button type="button" class="act primary" id="actSummon10"><b>영입 10회</b><small>가능한 만큼</small></button>
+      <button type="button" class="act goldish" id="actDesignated"><b>지정 영입</b><small>전설 · 3,000</small></button>
+      <button type="button" class="act" id="actSell"><b>등급 판매</b><small id="sellLbl">자동 판매 끔</small></button>
+      <button type="button" class="act" id="actMerge"><b>합성하기</b><small id="mergeLbl">가능 0</small></button>
+      <button type="button" class="act" id="actUpgrade"><b>등급 강화</b><small>같은 등급 전체</small></button>
+      <button type="button" class="act" id="actCraft"><b>조합하기</b><small id="craftLbl">가능 0</small></button>
+    </footer>
+  </section>
+
+  <!-- ═════════ 모달 ═════════ -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-box">
+      <header><h2 id="modalTitle"></h2><button type="button" id="modalClose" aria-label="닫기">✕</button></header>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+  <div id="globalToasts" class="global-toasts"></div>
+</div>
+
+<script src="js/data/config.js"></script>
+<script src="js/data/players.js"></script>
+<script src="js/data/photo-credits.js"></script>
+<script src="js/data/photo-crops.js"></script>
+<script src="js/photo.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/render.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

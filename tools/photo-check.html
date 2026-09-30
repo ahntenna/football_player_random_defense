@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사진 크롭 점검</title>
+<style>
+  body { margin: 0; background: #0b1420; color: #dfe8f0; font: 13px/1.4 system-ui, "Malgun Gothic", sans-serif; }
+  h1 { font-size: 16px; margin: 12px 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 0 16px 24px; }
+  .card { background: #13212f; border-radius: 10px; padding: 8px; text-align: center; }
+  .card canvas { display: block; margin: 0 auto 6px; }
+  .id { font-weight: 700; }
+  .small { opacity: .6; font-size: 11px; }
+</style>
+</head>
+<body>
+<h1>선수 사진 크롭 점검 (원본 위 사각형 = 크롭 영역, 아래 = 게임 내 원형 초상)</h1>
+<div class="grid" id="grid"></div>
+<script src="../js/data/config.js"></script>
+<script src="../js/data/players.js"></script>
+<script src="../js/data/photo-credits.js"></script>
+<script src="../js/data/photo-crops.js" onerror="void 0"></script>
+<script src="../js/photo.js"></script>
+<script>
+  var F = window.FPRD, grid = document.getElementById('grid');
+  F.PLAYERS.forEach(function (p) {
+    var c = F.PHOTO_CREDITS[p.id]; if (!c) return;
+    var card = document.createElement('div'); card.className = 'card';
+    var a = document.createElement('canvas'), b = document.createElement('canvas');
+    card.appendChild(a); card.appendChild(b);
+    card.insertAdjacentHTML('beforeend', '<div class="id">' + p.id + '</div><div class="small">' + p.name + ' · ' + c.w + 'x' + c.h + '</div>');
+    grid.appendChild(card);
+    var img = new Image();
+    img.onload = function () {
+      var sc = 130 / img.naturalHeight; a.width = Math.round(img.naturalWidth * sc); a.height = 130;
+      var g = a.getContext('2d'); g.drawImage(img, 0, 0, a.width, a.height);
+      var cr = F.photoCrop(p.id, img.naturalWidth, img.naturalHeight);
+      g.strokeStyle = '#ffd23f'; g.lineWidth = 2; g.strokeRect(cr.sx * sc, cr.sy * sc, cr.s * sc, cr.s * sc);
+      b.width = b.height = 72;
+      var h = b.getContext('2d'); h.save(); h.beginPath(); h.arc(36, 36, 36, 0, 7); h.clip();
+      h.drawImage(img, cr.sx, cr.sy, cr.s, cr.s, 0, 0, 72, 72); h.restore();
+    };
+    img.src = '../' + c.file;
+  });
+</script>
+</body>
+</html>
