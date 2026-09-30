@@ -15,6 +15,17 @@
     guirassy: [0.5, 0.2, 0.55],
     dumfries: [0.55, 0.22, 0.5],
     pacho: [0.5, 0.17, 0.45],
-    enzo: [0.5, 0.34, 0.8]
+    enzo: [0.5, 0.34, 0.8],
+    // 레전드
+    zidane: [0.49, 0.4, 0.86],
+    van_basten: [0.51, 0.42, 0.88],
+    ronaldo_nazario: [0.5, 0.36, 0.88],
+    iniesta: [0.32, 0.47, 0.44],
+    yashin: [0.49, 0.36, 0.56],
+    di_stefano: [0.53, 0.14, 0.34],
+    platini: [0.51, 0.39, 0.84],
+    garrincha: [0.56, 0.12, 0.32],
+    charlton: [0.51, 0.31, 0.7],
+    matthaus: [0.5, 0.28, 0.52]
   };
 })(typeof window !== 'undefined' ? window : globalThis);

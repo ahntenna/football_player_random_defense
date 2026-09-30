@@ -60,17 +60,15 @@
   var ROWS = [-5.5, -3.3, -1.1, 1.1, 3.3, 5.5];
   var SLOTS = [];
   for (var si = 0; si < C.SLOT_COUNT; si++) SLOTS.push({ x: COLS[si % 8], z: ROWS[Math.floor(si / 8)] });
-  // 트랙에 가까운 칸부터 채운다 (바깥 링 → 안쪽)
-  SLOTS.forEach(function (s, i) {
-    var m = Infinity;
-    for (var k = 0; k < LUT_N; k += 4) m = Math.min(m, Math.hypot(LUT_X[k] - s.x, LUT_Z[k] - s.z));
-    s.track = m; s.i = i;
-  });
-  var SLOT_ORDER = SLOTS.slice().sort(function (a, b) { return a.track - b.track || a.i - b.i; }).map(function (s) { return s.i; });
+  // 영입한 선수는 화면 기준 맨 윗줄 · 맨 왼쪽 칸부터 차례로 채운다.
+  // 가로 화면: 윗줄(z 작은 쪽)부터 왼쪽(x 작은 쪽)으로 = 칸 번호 순서
+  var SLOT_ORDER = SLOTS.map(function (s, i) { return i; });
+  // 세로(90° 회전) 화면: 화면의 윗줄 = 월드 x 가 작은 열, 화면의 왼쪽 = 월드 z 가 큰 행
+  var SLOT_ORDER_ROT = [];
+  for (var oc = 0; oc < 8; oc++) for (var orow = 5; orow >= 0; orow--) SLOT_ORDER_ROT.push(orow * 8 + oc);
 
-  F.GEO = { TRACK: TRACK, PITCH: PITCH, WORLD: WORLD, POLY: POLY, PATH_LENGTH: PATH_LENGTH, SLOTS: SLOTS, SLOT_ORDER: SLOT_ORDER, setPosition: setPosition };
+  F.GEO = { TRACK: TRACK, PITCH: PITCH, WORLD: WORLD, POLY: POLY, PATH_LENGTH: PATH_LENGTH, SLOTS: SLOTS, SLOT_ORDER: SLOT_ORDER, SLOT_ORDER_ROT: SLOT_ORDER_ROT, setPosition: setPosition };
 
-  var HIDDEN_POOL = PLAYERS.filter(function (p) { return p.hidden; });
   var TIER_POOLS = [];
   for (var ti = 0; ti <= 8; ti++) TIER_POOLS.push(PLAYERS.filter(function (p) { return !p.hidden && p.tier === ti; }));
   var ELITE_KEYS = ['swift', 'regen', 'armor', 'shield', 'split'];
@@ -144,7 +142,7 @@
       wave: 0, phase: 'ready', time: 0, waveTime: 0, spawned: 0, spawnClock: 0, intermission: C.FIRST_INTERMISSION,
       gold: C.START_GOLD + Math.round(this.fx.startGold), tickets: C.START_TICKETS, autoSellTier: null,
       upgrades: [0, 0, 0, 0, 0, 0, 0, 0, 0], units: [], enemies: [], nextId: 1, speed: 1, paused: false,
-      stats: { kills: 0, damage: 0, crit: 0, summon: 0, merge: 0, upgrade: 0, bosses: 0, missions: 0, spent: 0, sell: 0, move: 0, craft: 0, procs: 0, hiddenSummons: 0, incidents: 0 },
+      stats: { kills: 0, damage: 0, crit: 0, summon: 0, merge: 0, upgrade: 0, bosses: 0, missions: 0, spent: 0, sell: 0, move: 0, craft: 0, procs: 0, incidents: 0 },
       streak: 0, bestStreak: 0, mission: null, incident: null, incidentAt: Infinity, incidentStarted: false,
       eventIdx: -1, bossSpawned: false, bossDeadline: null, assistUntil: 0, assistDmg: 0,
       dps: 0, peakDps: 0, damageWindow: 0, windowTime: 0, score: 0, relicWaves: [], tokensEarned: 0, lossReason: null
@@ -159,11 +157,13 @@
 
   /* ───────── 슬롯 ───────── */
   G.freeSlot = function () {
-    var used = {}, units = this.s.units;
+    var used = {}, units = this.s.units, order = this.slotOrder || SLOT_ORDER;
     for (var i = 0; i < units.length; i++) used[units[i].slot] = 1;
-    for (var k = 0; k < SLOT_ORDER.length; k++) if (!used[SLOT_ORDER[k]]) return SLOT_ORDER[k];
+    for (var k = 0; k < order.length; k++) if (!used[order[k]]) return order[k];
     return -1;
   };
+  // 화면이 회전된 경우(세로 모바일) 렌더러가 회전 순서로 바꿔 준다
+  G.setSlotOrder = function (rotated) { this.slotOrder = rotated ? F.GEO.SLOT_ORDER_ROT : SLOT_ORDER; };
   G.unitAt = function (slot) { var u = this.s.units; for (var i = 0; i < u.length; i++) if (u[i].slot === slot) return u[i]; return null; };
   G.unitById = function (uid) { var u = this.s.units; for (var i = 0; i < u.length; i++) if (u[i].uid === uid) return u[i]; return null; };
 
@@ -813,18 +813,18 @@
 
   /* ───────── 영입(소환) ───────── */
   G.summonCost = function () { return Math.max(35, Math.round((C.SUMMON_COST - this.fx.summonDiscount) * 10) / 10); };
-  G.hiddenChance = function () { return Math.min(C.HIDDEN_CHANCE_CAP, C.HIDDEN_SUMMON_CHANCE + this.fx.hiddenBonus); };
+  // 영입 등급 가중치 (트로피 보정 포함). 히든은 영입 대상이 아니며 비밀 조합으로만 얻는다.
   G.summonWeights = function () {
-    var fx = this.fx, w = C.SUMMON_WEIGHTS.map(function (x, i) { return i === 4 ? x * (1 + fx.highTierLuck) : i === 5 ? x * (1 + fx.highTierLuck + fx.mythLuck) : x; });
+    var fx = this.fx, w = C.SUMMON_WEIGHTS.map(function (x, i) {
+      if (i === 4) return x * (1 + fx.highTierLuck);
+      if (i === 5) return x * (1 + fx.highTierLuck + fx.mythLuck);
+      if (i === 6) return x * (1 + fx.transLuck);
+      return x;
+    });
     var sum = w.reduce(function (a, b) { return a + b; }, 0);
     return w.map(function (x) { return x / sum; });
   };
-  G.summonOdds = function () {
-    var ord = 1 - this.hiddenChance();
-    var odds = this.summonWeights().map(function (w) { return w * ord * 100; });
-    odds.push(this.hiddenChance() * 100);
-    return odds;
-  };
+  G.summonOdds = function () { return this.summonWeights().map(function (w) { return w * 100; }); };
 
   G.summon = function () {
     var s = this.s;
@@ -833,27 +833,23 @@
     var cost = this.summonCost(), ticket = s.tickets > 0;
     if (!ticket && s.gold < cost) return { error: '골드가 부족해요.' };
     if (ticket) s.tickets--; else { s.gold -= cost; s.stats.spent += cost; }
-    var hc = this.hiddenChance(), draw = Math.random(), hidden = draw >= 1 - hc, tier = 0;
-    if (!hidden) {
-      var roll = draw / (1 - hc), w = this.summonWeights();
-      for (var i = 0; i < w.length; i++) { roll -= w[i]; if (roll < 0) { tier = i; break; } }
-    }
-    var pool = hidden ? HIDDEN_POOL : TIER_POOLS[tier], hero = pick(pool);
+    var roll = Math.random(), w = this.summonWeights(), tier = 0;
+    for (var i = 0; i < w.length; i++) { roll -= w[i]; if (roll < 0) { tier = i; break; } }
+    var hero = pick(TIER_POOLS[tier]);
     tier = hero.tier;
     if (!ticket && Math.random() < this.fx.refundChance) { s.gold += cost; this.emit('refund', cost); }
     s.stats.summon++;
-    if (hidden) s.stats.hiddenSummons++;
     this.stat('summons');
     if (tier >= 4) this.stat(TIER_STAT[tier]);
     var u = this.addUnit(hero.id);
-    this.emit('draw', u, hero, hidden);
+    this.emit('draw', u, hero, false);
     var sold = false, soldGold = 0;
-    if (!hidden && s.autoSellTier !== null && tier <= s.autoSellTier) {
+    if (s.autoSellTier !== null && tier <= s.autoSellTier) {
       var r = this.sell(u.uid, true);
       if (r.ok) { sold = true; soldGold = r.gold; }
     }
     this.emit('change');
-    return { ok: true, id: hero.id, tier: tier, hidden: hidden, autoSold: sold, autoSaleGold: soldGold, u: u };
+    return { ok: true, id: hero.id, tier: tier, autoSold: sold, autoSaleGold: soldGold, u: u };
   };
 
   G.summonMany = function (n) {

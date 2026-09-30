@@ -14,7 +14,7 @@
     if (o) { cx = o[0] * w; cy = o[1] * h; s = o[2] * w; }
     else if (h >= w) { s = w * 0.6; cx = w * 0.5; cy = h * 0.27; }
     else { s = h * 0.75; cx = w * 0.5; cy = h * 0.4; }
-    s = Math.min(s, w, h);
+    s = Math.min(s * 0.92, w, h); // 얼굴이 원 안에서 조금 더 크게 보이도록 살짝 확대
     return { sx: Math.max(0, Math.min(w - s, cx - s / 2)), sy: Math.max(0, Math.min(h - s, cy - s / 2)), s: s };
   };
 
@@ -37,15 +37,16 @@
     end();
   };
 
-  /* 원형 초상 캔버스 (크기별 캐시) */
+  /* 사각형 초상 캔버스 (경기장 배치칸과 같은 둥근 모서리 사각형, 크기별 캐시) */
   var portraitCache = {};
+  F.PORTRAIT_RADIUS = 0.14; // 한 변 대비 모서리 반지름
   F.portrait = function (id, size) {
     size = Math.max(8, Math.round(size));
     var img = F.photoImage(id), key = id + '@' + size + (img ? 'p' : 'f');
     if (portraitCache[key]) return portraitCache[key];
     var cv = document.createElement('canvas'); cv.width = cv.height = size;
-    var g = cv.getContext('2d'), p = F.BY_ID[id];
-    g.save(); g.beginPath(); g.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2); g.clip();
+    var g = cv.getContext('2d'), p = F.BY_ID[id], rad = size * F.PORTRAIT_RADIUS;
+    g.save(); roundRect(g, 0, 0, size, size, rad); g.clip();
     if (img) {
       var cr = F.photoCrop(id, img.naturalWidth, img.naturalHeight);
       g.imageSmoothingQuality = 'high';
@@ -58,6 +59,14 @@
     return cv;
   };
   F.clearPortraitCache = function () { portraitCache = {}; };
+
+  function roundRect(g, x, y, w, h, r) {
+    g.beginPath();
+    g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r);
+    g.lineTo(x + w, y + h - r); g.arcTo(x + w, y + h, x + w - r, y + h, r);
+    g.lineTo(x + r, y + h); g.arcTo(x, y + h, x, y + h - r, r);
+    g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r); g.closePath();
+  }
 
   function drawFallback(g, p, size) {
     var club = (F.CLUBS && F.CLUBS[p.club]) || { c1: '#335', c2: '#ccd' };

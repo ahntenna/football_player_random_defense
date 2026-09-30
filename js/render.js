@@ -3,12 +3,14 @@
  * - 배경 레이어(bg): 관중석 · 조명탑 · 광고판 · 트랙 · 피치 · 배치칸 → 리사이즈 때만 다시 그림
  * - 동적 레이어(fx): 선수 · 적 · 공(투사체) · 이펙트 · 피해 숫자 → 매 프레임
  * - 스프라이트 캐시 + 고정 크기 오브젝트 풀로 GC/드로우 비용 최소화
+ * - 세로로 긴 화면(모바일)에서는 경기장을 90° 돌려 그린다. 엔진 좌표계는 그대로이고 화면 변환(mx/my)만 바뀐다.
  */
 (function (root) {
   'use strict';
   var F = root.FPRD = root.FPRD || {};
   var C = F.C, GEO = F.GEO, BY_ID = F.BY_ID;
   var TAU = Math.PI * 2;
+  var RAINBOW = C.RAINBOW;
 
   function rr(g, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
@@ -21,6 +23,19 @@
   F.rr = rr;
 
   function seeded(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+  // 무지개(프리즘) 그라디언트 — 히든 등급 전용. 원뿔형을 지원하지 않는 브라우저는 선형으로 대체
+  function rainbow(g, cx, cy, r, angle) {
+    var gr;
+    if (g.createConicGradient) {
+      gr = g.createConicGradient(angle || 0, cx, cy);
+      for (var i = 0; i <= RAINBOW.length; i++) gr.addColorStop(i / RAINBOW.length, RAINBOW[i % RAINBOW.length]);
+    } else {
+      gr = g.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+      RAINBOW.forEach(function (c, i) { gr.addColorStop(i / (RAINBOW.length - 1), c); });
+    }
+    return gr;
+  }
 
   /* ───────── 풀 ───────── */
   function Pool(n, make) { this.items = []; for (var i = 0; i < n; i++) { var o = make(); o.on = false; this.items.push(o); } this.cursor = 0; }
@@ -35,6 +50,7 @@
     this.g = fx.getContext('2d'); this.bgG = bg.getContext('2d');
     this.game = null;
     this.W = 0; this.H = 0; this.dpr = 1; this.scale = 10; this.ox = 0; this.oy = 0;
+    this.rot = false;         // 세로 화면: 경기장을 90° 회전
     this.quality = 'high';
     this.dmgNumbers = true;
     this.highlight = true;    // 선수 강조 (어두운 배치칸 · 외곽 글로)
@@ -45,16 +61,16 @@
     this.anim = {};           // uid -> 공격 반동 타이머
     this.newbie = {};         // uid -> 등장 연출 타이머
     this.balls = new Pool(180, function () { return { x0: 0, y0: 0, x1: 0, y1: 0, t: 0, dur: 0.2, col: '#fff', mode: '', r: 0, big: false }; });
-    this.effects = new Pool(160, function () { return { type: '', x: 0, y: 0, x2: 0, y2: 0, r: 0, t: 0, dur: 0.3, col: '#fff', text: '', pts: [], w: 1 }; });
+    // text 이펙트: (x, y)=월드 기준점, dy=화면 기준 세로 오프셋(월드 단위) → 회전 뷰에서도 글자는 항상 선수 '위'에 뜬다
+    this.effects = new Pool(160, function () { return { type: '', x: 0, y: 0, x2: 0, y2: 0, r: 0, t: 0, dur: 0.3, col: '#fff', text: '', pts: [], w: 1, dy: 0 }; });
     this.numbers = new Pool(70, function () { return { x: 0, y: 0, t: 0, dur: 0.8, text: '', col: '#fff', size: 12 }; });
     this.numbersThisFrame = 0;
     this.shake = 0;
     this.ballSprite = null;
-    this.crowdFlashes = [];
   }
   var R = Renderer.prototype;
 
-  R.setGame = function (game) { this.game = game; this.selected = null; this.drag = null; this.anim = {}; this.newbie = {}; this.clearPools(); };
+  R.setGame = function (game) { this.game = game; this.selected = null; this.drag = null; this.anim = {}; this.newbie = {}; this.clearPools(); if (game && this.W) game.setSlotOrder(this.rot); };
   R.clearPools = function () {
     [this.balls, this.effects, this.numbers].forEach(function (p) { p.items.forEach(function (o) { o.on = false; }); });
   };
@@ -77,35 +93,57 @@
     this.cssW = w; this.cssH = h; this.dpr = dpr;
     this.W = Math.round(w * dpr); this.H = Math.round(h * dpr);
     [this.bg, this.fx].forEach(function (c) { c.width = this.W; c.height = this.H; c.style.width = w + 'px'; c.style.height = h + 'px'; }, this);
-    // 좁은 화면(모바일)에서는 관중석 여백을 줄여 트랙·선수를 크게 보여준다
-    var narrow = w < 560, vw = narrow ? GEO.TRACK.hw + 1.35 : GEO.WORLD.hw, vh = narrow ? GEO.TRACK.hh + 1.3 : GEO.WORLD.hh;
-    this.scale = Math.min(this.W / (vw * 2), this.H / (vh * 2));
+    // 세로로 긴 영역이면 회전 뷰, 좁은 화면이면 관중석 여백을 줄여 트랙 · 선수를 크게 보여준다
+    this.rot = h > w * 1.05;
+    if (this.game) this.game.setSlotOrder(this.rot); // 영입 배치 순서도 화면 기준(맨 윗줄 · 맨 왼쪽부터)
+    var narrow = Math.min(w, h) < 560 || this.rot;
+    var vw = narrow ? GEO.TRACK.hw + 1.35 : GEO.WORLD.hw, vh = narrow ? GEO.TRACK.hh + 1.3 : GEO.WORLD.hh;
+    this.scale = this.rot ? Math.min(this.W / (vh * 2), this.H / (vw * 2)) : Math.min(this.W / (vw * 2), this.H / (vh * 2));
     this.ox = this.W / 2; this.oy = this.H / 2;
     this.unitSprites = {}; this.enemySprites = {};
     this.ballSprite = this.makeBall(Math.max(6, Math.round(0.34 * this.scale)));
     this.drawBackground();
   };
 
-  R.sx = function (x) { return this.ox + x * this.scale; };
-  R.sy = function (z) { return this.oy + z * this.scale; };
-  R.toWorld = function (cssX, cssY) { return { x: (cssX * this.dpr - this.ox) / this.scale, z: (cssY * this.dpr - this.oy) / this.scale }; };
+  /* 월드(x, z) → 화면(px). 회전 뷰: 화면 x = 중심 − z, 화면 y = 중심 + x (시계 방향 90°) */
+  R.mx = function (x, z) { return this.rot ? this.ox - z * this.scale : this.ox + x * this.scale; };
+  R.my = function (x, z) { return this.rot ? this.oy + x * this.scale : this.oy + z * this.scale; };
+  R.toWorld = function (cssX, cssY) {
+    var px = cssX * this.dpr, py = cssY * this.dpr, s = this.scale;
+    return this.rot ? { x: (py - this.oy) / s, z: (this.ox - px) / s } : { x: (px - this.ox) / s, z: (py - this.oy) / s };
+  };
   R.slotAt = function (cssX, cssY) {
     var p = this.toWorld(cssX, cssY), S = GEO.SLOTS;
     for (var i = 0; i < S.length; i++) if (Math.abs(p.x - S[i].x) <= 1.25 && Math.abs(p.z - S[i].z) <= 1.1) return i;
     return -1;
   };
+  // 선수의 화면(CSS px) 위치 — UI 가 정보 카드를 선수를 가리지 않는 쪽에 띄울 때 사용
+  R.slotScreen = function (slot) {
+    var sl = GEO.SLOTS[slot];
+    return { x: this.mx(sl.x, sl.z) / this.dpr, y: this.my(sl.x, sl.z) / this.dpr, h: this.cssH, w: this.cssW };
+  };
 
   /* ═════════════ 배경 ═════════════ */
   R.drawBackground = function (opts) {
-    var g = this.bgG, W = this.W, H = this.H, s = this.scale, self = this, T = GEO.TRACK, P = GEO.PITCH;
+    var g = this.bgG, W = this.W, H = this.H, s = this.scale, self = this, T = GEO.TRACK, P = GEO.PITCH, rot = this.rot;
     opts = opts || {};
-    var X = function (x) { return self.ox + x * s; }, Y = function (z) { return self.oy + z * s; };
+    // 회전 뷰는 가로(landscape) 논리 좌표계에 그린 뒤 캔버스 변환으로 90° 돌린다
+    var LW = rot ? H : W, LH = rot ? W : H, cx = LW / 2, cy = LH / 2;
+    var X = function (x) { return cx + x * s; }, Y = function (z) { return cy + z * s; };
     var rnd = seeded(20251216);
+    var baseT = rot ? [0, 1, -1, 0, W, 0] : [1, 0, 0, 1, 0, 0];
+    function base() { g.setTransform(baseT[0], baseT[1], baseT[2], baseT[3], baseT[4], baseT[5]); }
+    // 회전 뷰에서도 글자가 똑바로 서도록 논리 좌표 → 화면 좌표로 옮겨 그린다
+    function upright(text, lx, ly) {
+      if (!rot) { g.fillText(text, lx, ly); return; }
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.fillText(text, W - ly, lx); g.restore();
+    }
 
-    // 밤하늘 + 관중석 기본색
+    g.setTransform(1, 0, 0, 1, 0, 0);
     var sky = g.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, '#08101d'); sky.addColorStop(0.5, '#0c1626'); sky.addColorStop(1, '#070d18');
     g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    base();
 
     // 관중석 계단(스탠드) 링
     for (var k = 7; k >= 0; k--) {
@@ -117,9 +155,9 @@
     var step = Math.max(3, Math.round(s * 0.2)), dot = Math.max(1.5, step * 0.62);
     var palette = ['#2754c9', '#e8edf5', '#d33a3a', '#f2c230', '#1d2a44', '#3fa0ff', '#ff7a45', '#c9d4e3', '#152035'];
     var inner = { hw: T.hw + 1.2, hh: T.hh + 1.2, r: T.r + 1.2 };
-    for (var yy = 0; yy < H; yy += step) {
-      for (var xx = 0; xx < W; xx += step) {
-        var wx = (xx - this.ox) / s, wz = (yy - this.oy) / s;
+    for (var yy = 0; yy < LH; yy += step) {
+      for (var xx = 0; xx < LW; xx += step) {
+        var wx = (xx - cx) / s, wz = (yy - cy) / s;
         if (insideRR(wx, wz, inner)) continue;
         if (rnd() < 0.18) continue;
         g.globalAlpha = 0.35 + rnd() * 0.45;
@@ -129,7 +167,7 @@
     }
     g.globalAlpha = 1;
 
-    // 광고판 (LED 보드)
+    // 광고판 (LED 보드) — 회전 뷰에서는 긴 변을 따라 세로로 흐른다
     var boardH = 0.34 * s;
     rr(g, X(-T.hw - 1.05), Y(-T.hh - 1.05), (T.hw + 1.05) * 2 * s, (T.hh + 1.05) * 2 * s, (T.r + 1.05) * s);
     g.lineWidth = boardH; g.strokeStyle = '#0a1322'; g.stroke();
@@ -154,7 +192,7 @@
     var gx = X(-T.hw + T.r), gz = Y(-T.hh);
     g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(gx - s * 0.05, gz - s, s * 0.1, s * 2);
     g.fillStyle = '#ff5b5b'; g.font = '800 ' + Math.round(s * 0.42) + 'px "Black Han Sans","Malgun Gothic",sans-serif';
-    g.fillText('AWAY ▶', gx + s * 1.25, gz - s * 1.52);
+    if (rot) upright('AWAY ▼', gx + s * 1.1, gz - s * 1.55); else upright('AWAY ▶', gx + s * 1.25, gz - s * 1.52);
 
     // 트랙 안쪽 잔디 여백
     var hl = this.highlight; // 선수 강조: 잔디를 야간 톤으로 낮춰 초상과 대비를 키운다
@@ -205,14 +243,14 @@
     // 센터 서클 엠블럼
     g.globalAlpha = 0.09; g.fillStyle = '#fff';
     g.font = '400 ' + Math.round(s * 1.05) + 'px "Black Han Sans","Malgun Gothic",sans-serif';
-    g.fillText('FPRD', X(0), Y(0)); g.globalAlpha = 1;
+    upright('FPRD', X(0), Y(0)); g.globalAlpha = 1;
 
     // 조명탑
     [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (c) {
       var lx = X(c[0] * (GEO.WORLD.hw - 0.55)), ly = Y(c[1] * (GEO.WORLD.hh - 0.45));
       var lg = g.createRadialGradient(lx, ly, 0, lx, ly, s * 9);
       lg.addColorStop(0, hl ? 'rgba(255,250,215,.13)' : 'rgba(255,250,215,.20)'); lg.addColorStop(1, 'rgba(255,250,215,0)');
-      g.globalCompositeOperation = 'lighter'; g.fillStyle = lg; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+      g.globalCompositeOperation = 'lighter'; g.fillStyle = lg; g.fillRect(0, 0, LW, LH); g.globalCompositeOperation = 'source-over';
       g.fillStyle = '#1b2436'; rr(g, lx - s * 0.55, ly - s * 0.32, s * 1.1, s * 0.64, s * 0.1); g.fill();
       g.fillStyle = '#fffbe0';
       for (var i = 0; i < 4; i++) for (var j = 0; j < 2; j++) g.fillRect(lx - s * 0.45 + i * s * 0.24, ly - s * 0.22 + j * s * 0.24, s * 0.17, s * 0.17);
@@ -224,16 +262,17 @@
         rr(g, X(sl.x - 1.08), Y(sl.z - 0.98), 2.16 * s, 1.96 * s, 0.22 * s);
         g.fillStyle = hl ? 'rgba(5,11,22,.6)' : 'rgba(255,255,255,.045)'; g.fill();
         g.lineWidth = Math.max(1, s * 0.03); g.strokeStyle = hl ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.13)'; g.stroke();
-        if (hl) {
-          g.beginPath(); g.arc(X(sl.x), Y(sl.z), 0.86 * s, 0, TAU);
+        if (hl) { // 빈칸 표시: 선수 카드와 같은 둥근 사각형 윤곽
+          rr(g, X(sl.x - 0.78), Y(sl.z - 0.78), 1.56 * s, 1.56 * s, 1.56 * s * F.PORTRAIT_RADIUS);
           g.lineWidth = Math.max(1, s * 0.025); g.strokeStyle = 'rgba(255,255,255,.07)'; g.stroke();
         }
       });
     }
     // 비네트
-    var vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+    var vg = g.createRadialGradient(cx, cy, Math.min(LW, LH) * 0.35, cx, cy, Math.max(LW, LH) * 0.75);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)');
-    g.fillStyle = vg; g.fillRect(0, 0, W, H);
+    g.fillStyle = vg; g.fillRect(0, 0, LW, LH);
+    g.setTransform(1, 0, 0, 1, 0, 0);
   };
 
   function insideRR(x, z, t) {
@@ -261,40 +300,63 @@
     g.closePath(); g.fill();
   }
 
-  R.unitSize = function () { return Math.round((this.highlight ? 1.88 : 1.72) * this.scale); };
+  /* 선수 카드 치수 (화면 px): 배치칸(둥근 사각형) 안에 사각형 초상 + 아래 이름표가 들어간다.
+     이름표는 초상 아래 가장자리를 살짝 덮어 목 부분만 가리고 얼굴은 가리지 않는다. */
+  R.unitBox = function () {
+    var s = this.scale, P = Math.round((this.highlight ? 1.64 : 1.56) * s), L = Math.max(13, Math.round(0.5 * s)), ov = Math.round(0.18 * s);
+    var H = P + L - ov, tileW = (this.rot ? 1.96 : 2.16) * s;
+    return { P: P, L: L, ov: ov, H: H, maxW: Math.floor(tileW - 0.08 * s), dy: -(L - ov) / 2, rad: P * F.PORTRAIT_RADIUS };
+  };
+
+  // 이름표 글자: 칸에 전체 이름이 들어가면 전체 이름, 넘치면 대표 이름(성 또는 이름), 그래도 넘치면 글자 크기를 줄인다
+  function fitName(g, def, maxW, L) {
+    var fs = Math.max(9, Math.round(L * 0.64)), padX = L * 0.3, name = def.name;
+    var font = function (n) { return '800 ' + n + 'px "Noto Sans KR","Malgun Gothic",sans-serif'; };
+    g.font = font(fs);
+    if (g.measureText(name).width + padX * 2 > maxW) name = def.short;
+    while (g.measureText(name).width + padX * 2 > maxW && fs > 8) { fs--; g.font = font(fs); }
+    return { text: name, width: g.measureText(name).width, pad: padX };
+  }
 
   R.unitSprite = function (id) {
     var sp = this.unitSprites[id]; if (sp) return sp;
-    var def = BY_ID[id], size = this.unitSize(), pad = Math.ceil(size * 0.16), full = size + pad * 2, hl = this.highlight;
-    var c = document.createElement('canvas'); c.width = c.height = full;
-    var g = c.getContext('2d'), m = full / 2, r = size / 2, tier = C.TIERS[def.tier];
+    var def = BY_ID[id], b = this.unitBox(), P = b.P, hl = this.highlight, tier = C.TIERS[def.tier], hidden = !!def.hidden;
+    var pad = Math.ceil(P * 0.16), Wc = Math.max(P, b.maxW) + pad * 2, Hc = b.H + pad * 2;
+    var c = document.createElement('canvas'); c.width = Wc; c.height = Hc;
+    var g = c.getContext('2d'), cx = Wc / 2, px = cx - P / 2, py = pad, rad = b.rad;
     // 그림자
-    g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.ellipse(m, m + r * 0.92, r * 0.85, r * 0.26, 0, 0, TAU); g.fill();
-    // 선수 강조: 등급 색 글로 + 어두운 외곽 테두리 (스프라이트에 한 번만 그리므로 프레임 비용 없음)
+    g.fillStyle = 'rgba(0,0,0,.4)'; rr(g, px + 1, py + P * 0.06, P, P, rad); g.fill();
+    // 선수 강조: 등급 색 글로 + 얇은 어두운 외곽선 (스프라이트에 한 번만 그리므로 프레임 비용 없음)
     if (hl) {
+      var o = Math.max(1, P * 0.022);
       g.save();
-      g.shadowColor = hexA(tier.color, def.tier >= 1 ? 0.85 : 0.55); g.shadowBlur = size * 0.2;
-      g.fillStyle = '#050a14'; g.beginPath(); g.arc(m, m, r + Math.max(1.5, size * 0.045), 0, TAU); g.fill();
+      g.shadowColor = hexA(tier.color, def.tier >= 1 ? 0.75 : 0.5); g.shadowBlur = P * 0.14;
+      g.fillStyle = '#050a14'; rr(g, px - o, py - o, P + o * 2, P + o * 2, rad + o); g.fill();
       g.restore();
     }
-    // 등급 링
-    var ring = Math.max(2, size * (hl ? 0.1 : 0.085));
-    if (def.tier >= 5) {
-      var gr = g.createLinearGradient(0, 0, full, full);
+    // 등급 테두리 — 배치칸과 같은 둥근 사각형, 얇게 (한 변의 약 5%)
+    var ring = Math.max(1.5, P * 0.05), inner = P - ring * 2;
+    if (hidden) g.fillStyle = rainbow(g, cx, py + P / 2, P / 2, -Math.PI / 2);
+    else if (def.tier >= 5) {
+      var gr = g.createLinearGradient(px, py, px + P, py + P);
       gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.5, tier.color); gr.addColorStop(1, F.shade(tier.color, -0.3));
       g.fillStyle = gr;
     } else g.fillStyle = tier.color;
-    g.beginPath(); g.arc(m, m, r, 0, TAU); g.fill();
-    g.drawImage(F.portrait(id, size - ring * 2), m - r + ring, m - r + ring);
-    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; g.beginPath(); g.arc(m, m, r - ring, 0, TAU); g.stroke();
-    // 포지션 배지
-    var pos = C.POSITIONS[def.pos], bw = size * 0.46, bh = size * 0.24;
-    rr(g, m - bw / 2, m + r - bh * 0.7, bw, bh, bh / 2);
-    g.fillStyle = 'rgba(8,14,24,.92)'; g.fill();
-    g.lineWidth = Math.max(1, size * 0.03); g.strokeStyle = tier.color; g.stroke();
-    g.fillStyle = pos.color; g.font = '800 ' + Math.round(bh * 0.72) + 'px "Black Han Sans","Malgun Gothic",sans-serif';
+    rr(g, px, py, P, P, rad); g.fill();
+    g.drawImage(F.portrait(id, inner), px + ring, py + ring);
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; rr(g, px + ring, py + ring, inner, inner, inner * F.PORTRAIT_RADIUS); g.stroke();
+    // 이름표
+    var nm = fitName(g, def, b.maxW, b.L), lw = Math.min(b.maxW, Math.max(P * 0.7, nm.width + nm.pad * 2)), ly = py + P - b.ov;
+    rr(g, cx - lw / 2, ly, lw, b.L, b.L * 0.32);
+    g.fillStyle = 'rgba(6,11,20,.94)'; g.fill();
+    g.lineWidth = Math.max(1, P * 0.022); g.strokeStyle = hidden ? rainbow(g, cx, ly + b.L / 2, lw / 2, 0) : tier.color; g.stroke();
+    if (hidden) {
+      var tg = g.createLinearGradient(cx - nm.width / 2, 0, cx + nm.width / 2, 0);
+      RAINBOW.forEach(function (col, i) { tg.addColorStop(i / (RAINBOW.length - 1), col); });
+      g.fillStyle = tg;
+    } else g.fillStyle = '#f4f7fb';
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(def.hidden ? '★' + pos.short : pos.short, m, m + r - bh * 0.7 + bh / 2 + 0.5);
+    g.fillText(nm.text, cx, ly + b.L / 2 + 0.5);
     this.unitSprites[id] = c;
     return c;
   };
@@ -360,6 +422,12 @@
     }
   };
 
+  R.addText = function (x, z, dy, text, col, scale, dur) {
+    var t = this.effects.get();
+    t.type = 'text'; t.x = x; t.y = z; t.dy = dy; t.t = 0; t.dur = dur || 1; t.col = col || '#fff'; t.text = text; t.w = scale || 1;
+    return t;
+  };
+
   R.onProc = function (u, def, targets, primary) {
     var sl = GEO.SLOTS[u.slot], col = C.STYLES[def.style].color, sk = def.skill;
     var e = this.effects.get();
@@ -373,13 +441,12 @@
       else { l.type = 'poly'; l.pts.length = 0; for (var i = 0; i < targets.length && i < 14; i++) l.pts.push(targets[i].x, targets[i].z); l.w = 3; }
       l.t = 0; l.dur = 0.35; l.col = col;
     }
-    var t = this.effects.get();
-    t.type = 'text'; t.x = sl.x; t.y = sl.z - 1.05; t.t = 0; t.dur = 1.0; t.col = def.tier >= 8 ? '#ffd23f' : '#fff'; t.text = sk.name; t.w = def.tier >= 7 ? 1.25 : 1;
+    this.addText(sl.x, sl.z, -1.05, sk.name, def.hidden ? C.TIERS[def.tier].color : '#fff', def.tier >= 7 ? 1.25 : 1, 1.0);
   };
 
   R.onPassive = function (u, name) {
-    var sl = GEO.SLOTS[u.slot], def = BY_ID[u.id], t = this.effects.get();
-    t.type = 'text'; t.x = sl.x; t.y = sl.z - 1.05; t.t = 0; t.dur = 0.9; t.col = C.TIERS[def.tier].color; t.text = name; t.w = 0.95;
+    var sl = GEO.SLOTS[u.slot], def = BY_ID[u.id];
+    this.addText(sl.x, sl.z, -1.05, name, C.TIERS[def.tier].color, 0.95, 0.9);
   };
 
   R.onBurst = function (x, z, r, style) {
@@ -400,7 +467,7 @@
     if (!crit && !e.boss && Math.random() > 0.12) return;
     this.numbersThisFrame++;
     var n = this.numbers.get();
-    n.x = e.x + (Math.random() - 0.5) * 0.5; n.y = e.z - 0.5; n.t = 0; n.dur = 0.75;
+    n.x = e.x + (Math.random() - 0.5) * 0.5; n.y = e.z + (Math.random() - 0.5) * 0.5; n.t = 0; n.dur = 0.75;
     n.text = C.fmt(d) + (crit ? '!' : ''); n.col = crit ? '#ffd23f' : '#ffffff'; n.size = crit ? 1.15 : 0.9;
   };
 
@@ -410,18 +477,13 @@
     if (e.boss) this.shake = 0.4;
   };
 
-  R.onSeal = function (u) {
-    var sl = GEO.SLOTS[u.slot], t = this.effects.get();
-    t.type = 'text'; t.x = sl.x; t.y = sl.z - 1.05; t.t = 0; t.dur = 1.2; t.col = '#ff4d4d'; t.text = '🟥 퇴장!'; t.w = 1.1;
-  };
-  R.onFloat = function (x, z, text, col, scale) {
-    var t = this.effects.get(); t.type = 'text'; t.x = x; t.y = z; t.t = 0; t.dur = 1.2; t.col = col || '#fff'; t.text = text; t.w = scale || 1;
-  };
+  R.onSeal = function (u) { var sl = GEO.SLOTS[u.slot]; this.addText(sl.x, sl.z, -1.05, '🟥 퇴장!', '#ff4d4d', 1.1, 1.2); };
+  R.onFloat = function (x, z, text, col, scale) { this.addText(x, z, -1.2, text, col, scale, 1.2); };
   R.onSpawnUnit = function (u) { this.newbie[u.uid] = 0.45; };
 
   /* ═════════════ 프레임 ═════════════ */
   R.draw = function (dt) {
-    var g = this.g, game = this.game, s = this.scale, self = this;
+    var g = this.g, game = this.game, s = this.scale, rot = this.rot;
     this.time += dt; this.numbersThisFrame = 0;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, this.W, this.H);
@@ -432,14 +494,14 @@
 
     // 선택 · 드래그 하이라이트
     if (this.drag && this.hoverSlot >= 0) {
-      var hs = GEO.SLOTS[this.hoverSlot];
-      rr(g, this.sx(hs.x - 1.08), this.sy(hs.z - 0.98), 2.16 * s, 1.96 * s, 0.22 * s);
+      var hs = GEO.SLOTS[this.hoverSlot], hw = (rot ? 1.96 : 2.16) * s, hh = (rot ? 2.16 : 1.96) * s;
+      rr(g, this.mx(hs.x, hs.z) - hw / 2, this.my(hs.x, hs.z) - hh / 2, hw, hh, 0.22 * s);
       g.fillStyle = 'rgba(255,210,63,.18)'; g.fill(); g.strokeStyle = 'rgba(255,210,63,.8)'; g.lineWidth = 2; g.stroke();
     }
     var sel = this.selected !== null ? game.unitById(this.selected) : null;
     if (sel) {
       var ss = GEO.SLOTS[sel.slot], p = game.power(sel), sd = BY_ID[sel.id];
-      g.beginPath(); g.arc(this.sx(ss.x), this.sy(ss.z), p.range * s, 0, TAU);
+      g.beginPath(); g.arc(this.mx(ss.x, ss.z), this.my(ss.x, ss.z), p.range * s, 0, TAU);
       g.fillStyle = hexA(C.STYLES[sd.style].color, 0.08); g.fill();
       g.setLineDash([6, 5]); g.lineWidth = 1.5; g.strokeStyle = hexA(C.STYLES[sd.style].color, 0.7); g.stroke(); g.setLineDash([]);
     }
@@ -450,7 +512,7 @@
       e = en[i]; if (e.hp <= 0) continue;
       var key = e.boss ? 'boss' : e.child ? 'child' : e.elite ? e.kind : 'normal';
       var sz = e.boss ? 1.75 : e.child ? 0.58 : e.elite ? 0.95 : 0.78;
-      var spr = this.enemySprite(key, sz), ex = this.sx(e.x), ey = this.sy(e.z);
+      var spr = this.enemySprite(key, sz), ex = this.mx(e.x, e.z), ey = this.my(e.x, e.z);
       g.drawImage(spr, ex - spr.width / 2, ey - spr.height / 2);
       var rad = sz * s * 0.5;
       if (this.quality !== 'low') {
@@ -476,38 +538,40 @@
       }
     }
 
-    // 선수
-    var units = st.units, usz = this.unitSize();
+    // 선수 — 사각형 초상 카드 (초상 중심은 칸 중심보다 이름표 높이만큼 위)
+    var units = st.units, box = this.unitBox(), P = box.P, half = P / 2, brad = box.rad;
     for (i = 0; i < units.length; i++) {
       var u = units[i], sl = GEO.SLOTS[u.slot];
       if (this.drag && this.drag.uid === u.uid && this.drag.moved) continue;
-      var sp = this.unitSprite(u.id), ux = this.sx(sl.x), uy = this.sy(sl.z), k = 1;
+      var sp = this.unitSprite(u.id), ux = this.mx(sl.x, sl.z), uy = this.my(sl.x, sl.z), k = 1;
       var an = this.anim[u.uid]; if (an > 0) { this.anim[u.uid] = an - dt; k = 1 + an * 0.45; }
       var nb = this.newbie[u.uid]; if (nb > 0) { this.newbie[u.uid] = nb - dt; k *= 1 + nb * 0.9; }
-      var w = sp.width * k;
-      g.drawImage(sp, ux - w / 2, uy - w / 2, w, w);
-      var def = BY_ID[u.id];
+      var w = sp.width * k, h = sp.height * k;
+      var def = BY_ID[u.id], pcx = ux, pcy = uy + box.dy * k;
       if (def.hidden) {
-        g.strokeStyle = '#ffd23f'; g.lineWidth = Math.max(2, usz * 0.07);
-        g.beginPath(); g.arc(ux, uy, usz / 2 + 2, this.time * 3, this.time * 3 + 2.2); g.stroke();
-        g.beginPath(); g.arc(ux, uy, usz / 2 + 2, this.time * 3 + Math.PI, this.time * 3 + Math.PI + 2.2); g.stroke();
+        // 히든: 회전하는 무지개(프리즘) 테두리 — 전설(금색)과 한눈에 구분된다.
+        // 카드보다 먼저(뒤에) 그려서 이름표가 테두리 위에 오도록 한다 (이름 글자가 가려지지 않게)
+        var lw = Math.max(2, P * 0.05), o = lw * 0.5 + 2;
+        g.strokeStyle = rainbow(g, pcx, pcy, half, this.time * 2.4); g.lineWidth = lw;
+        rr(g, pcx - half - o, pcy - half - o, P + o * 2, P + o * 2, brad + o); g.stroke();
       }
+      g.drawImage(sp, ux - w / 2, uy - h / 2, w, h);
       if (u.disabled > 0) {
-        g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.arc(ux, uy, usz / 2, 0, TAU); g.fill();
-        g.fillStyle = '#e02424'; g.fillRect(ux - usz * 0.12, uy - usz * 0.2, usz * 0.24, usz * 0.34);
+        g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, pcx - half, pcy - half, P, P, brad); g.fill();
+        g.fillStyle = '#e02424'; g.fillRect(pcx - P * 0.12, pcy - P * 0.2, P * 0.24, P * 0.34);
       }
       if (this.mergeable[u.id] && !u.locked) {
-        g.fillStyle = '#39d98a'; g.beginPath(); g.arc(ux + usz * 0.38, uy - usz * 0.38, usz * 0.15, 0, TAU); g.fill();
-        g.fillStyle = '#062'; g.font = '900 ' + Math.round(usz * 0.2) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText('▲', ux + usz * 0.38, uy - usz * 0.38 + 1);
+        g.fillStyle = '#39d98a'; g.beginPath(); g.arc(pcx + P * 0.44, pcy - P * 0.44, P * 0.15, 0, TAU); g.fill();
+        g.fillStyle = '#062'; g.font = '900 ' + Math.round(P * 0.2) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('▲', pcx + P * 0.44, pcy - P * 0.44 + 1);
       }
       if (u.locked) {
-        g.fillStyle = 'rgba(10,16,28,.9)'; g.beginPath(); g.arc(ux - usz * 0.38, uy - usz * 0.38, usz * 0.15, 0, TAU); g.fill();
-        g.font = Math.round(usz * 0.17) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🔒', ux - usz * 0.38, uy - usz * 0.37);
+        g.fillStyle = 'rgba(10,16,28,.9)'; g.beginPath(); g.arc(pcx - P * 0.44, pcy - P * 0.44, P * 0.15, 0, TAU); g.fill();
+        g.font = Math.round(P * 0.17) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🔒', pcx - P * 0.44, pcy - P * 0.43);
       }
       if (sel && sel.uid === u.uid) {
         g.strokeStyle = '#fff'; g.lineWidth = 2; g.setLineDash([4, 3]);
-        g.beginPath(); g.arc(ux, uy, usz / 2 + 5, 0, TAU); g.stroke(); g.setLineDash([]);
+        rr(g, pcx - half - 5, pcy - half - 5, P + 10, box.H + 9, brad + 5); g.stroke(); g.setLineDash([]);
       }
     }
     if (this.drag && this.drag.moved) {
@@ -515,7 +579,7 @@
       if (du) { var dsp = this.unitSprite(du.id); g.globalAlpha = 0.85; g.drawImage(dsp, this.drag.x * this.dpr - dsp.width / 2, this.drag.y * this.dpr - dsp.height / 2); g.globalAlpha = 1; }
     }
 
-    // 공 (투사체)
+    // 공 (투사체) — 포물선 높이는 화면 기준 위쪽으로
     var bs = this.ballSprite, balls = this.balls.items;
     for (i = 0; i < balls.length; i++) {
       var b = balls[i]; if (!b.on) continue;
@@ -527,7 +591,7 @@
         continue;
       }
       var bx = b.x0 + (b.x1 - b.x0) * f, bz = b.y0 + (b.y1 - b.y0) * f, lift = Math.sin(f * Math.PI) * (b.mode === 'line' ? 0.2 : 0.8);
-      var px = this.sx(bx), py = this.sy(bz - lift), bsz = b.big ? bs.width * 1.35 : bs.width;
+      var px = this.mx(bx, bz), py = this.my(bx, bz) - lift * s, bsz = b.big ? bs.width * 1.35 : bs.width;
       g.drawImage(bs, px - bsz / 2, py - bsz / 2, bsz, bsz);
     }
 
@@ -541,30 +605,30 @@
       switch (x.type) {
         case 'ring':
           g.globalAlpha = alpha; g.strokeStyle = x.col; g.lineWidth = x.w;
-          g.beginPath(); g.arc(this.sx(x.x), this.sy(x.y), Math.max(1, x.r * s * (0.35 + q * 0.65)), 0, TAU); g.stroke();
+          g.beginPath(); g.arc(this.mx(x.x, x.y), this.my(x.x, x.y), Math.max(1, x.r * s * (0.35 + q * 0.65)), 0, TAU); g.stroke();
           break;
         case 'puff':
           g.globalAlpha = alpha * 0.9; g.strokeStyle = x.col; g.lineWidth = x.w;
-          g.beginPath(); g.arc(this.sx(x.x), this.sy(x.y), Math.max(1, x.r * s * q), 0, TAU); g.stroke();
+          g.beginPath(); g.arc(this.mx(x.x, x.y), this.my(x.x, x.y), Math.max(1, x.r * s * q), 0, TAU); g.stroke();
           break;
         case 'line':
           g.globalAlpha = alpha; g.strokeStyle = x.col; g.lineWidth = x.w * (1 + (1 - q));
-          g.beginPath(); g.moveTo(this.sx(x.x), this.sy(x.y)); g.lineTo(this.sx(x.x2), this.sy(x.y2)); g.stroke();
+          g.beginPath(); g.moveTo(this.mx(x.x, x.y), this.my(x.x, x.y)); g.lineTo(this.mx(x.x2, x.y2), this.my(x.x2, x.y2)); g.stroke();
           break;
         case 'poly':
           if (x.pts.length < 4) break;
           g.globalAlpha = alpha; g.strokeStyle = x.col; g.lineWidth = x.w * 1.5;
-          g.beginPath(); g.moveTo(this.sx(x.pts[0]), this.sy(x.pts[1]));
-          for (var j = 2; j < x.pts.length; j += 2) g.lineTo(this.sx(x.pts[j]), this.sy(x.pts[j + 1]));
+          g.beginPath(); g.moveTo(this.mx(x.pts[0], x.pts[1]), this.my(x.pts[0], x.pts[1]));
+          for (var j = 2; j < x.pts.length; j += 2) g.lineTo(this.mx(x.pts[j], x.pts[j + 1]), this.my(x.pts[j], x.pts[j + 1]));
           g.stroke();
           break;
         case 'text':
           g.globalAlpha = q < 0.8 ? 1 : (1 - q) / 0.2;
           var fs = Math.round(s * 0.46 * x.w);
           g.font = '800 ' + fs + 'px "Black Han Sans","Malgun Gothic",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-          var ty = this.sy(x.y) - q * s * 0.8;
-          g.lineWidth = Math.max(2, fs * 0.2); g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(x.text, this.sx(x.x), ty);
-          g.fillStyle = x.col; g.fillText(x.text, this.sx(x.x), ty);
+          var tx = this.mx(x.x, x.y), ty = this.my(x.x, x.y) + x.dy * s - q * s * 0.8;
+          g.lineWidth = Math.max(2, fs * 0.2); g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(x.text, tx, ty);
+          g.fillStyle = x.col; g.fillText(x.text, tx, ty);
           break;
       }
     }
@@ -572,14 +636,14 @@
 
     // 피해 숫자
     var nums = this.numbers.items;
-    if (nums.length) { g.textAlign = 'center'; g.textBaseline = 'middle'; }
+    g.textAlign = 'center'; g.textBaseline = 'middle';
     for (i = 0; i < nums.length; i++) {
       var n = nums[i]; if (!n.on) continue;
       n.t += dt; var nq = n.t / n.dur; if (nq >= 1) { n.on = false; continue; }
       var nfs = Math.round(s * 0.36 * n.size);
       g.font = '800 ' + nfs + 'px "Black Han Sans","Malgun Gothic",sans-serif';
       g.globalAlpha = nq < 0.7 ? 1 : (1 - nq) / 0.3;
-      var nx = this.sx(n.x), ny = this.sy(n.y) - nq * s * 0.7;
+      var nx = this.mx(n.x, n.y), ny = this.my(n.x, n.y) - 0.5 * s - nq * s * 0.7;
       g.lineWidth = Math.max(2, nfs * 0.22); g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(n.text, nx, ny);
       g.fillStyle = n.col; g.fillText(n.text, nx, ny);
     }

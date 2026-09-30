@@ -15,12 +15,15 @@
   function toggle(node, cls, on) { if (node && node.classList.contains(cls) !== !!on) node.classList.toggle(cls, !!on); }
   var fmt = C.fmt;
 
-  function tierTag(t) { var T = C.TIERS[t]; return '<span class="tier-tag" style="background:' + T.color + '">' + T.name + '</span>'; }
+  // 히든은 무지개(프리즘)로 표시해 전설(금색)과 구분한다
+  function tierTag(t) { var T = C.TIERS[t]; return '<span class="tier-tag' + (T.rainbow ? ' rb-bg' : '') + '" style="background:' + (T.rainbow ? C.RAINBOW_CSS : T.color) + '">' + T.name + '</span>'; }
+  function tierText(t) { var T = C.TIERS[t]; return T.rainbow ? '<span class="rb-text">' + T.name + '</span>' : '<span style="color:' + T.color + '">' + T.name + '</span>'; }
   function styleChip(k) { var S = C.STYLES[k]; return '<span class="chip" style="border-color:' + S.color + '66;color:' + S.color + '">' + S.icon + ' ' + S.name + '</span>'; }
   function posChip(p) { var P = C.POSITIONS[p]; return '<span class="chip" style="color:' + P.color + '">' + P.short + ' · ' + P.name + '</span>'; }
   function pc(id, size, extra) {
-    var t = C.TIERS[BY_ID[id].tier].color;
-    return '<canvas data-pid="' + id + '" data-size="' + size + '" style="box-shadow:0 0 0 2px ' + t + (extra || '') + '"></canvas>';
+    var T = C.TIERS[BY_ID[id].tier];
+    var ring = T.rainbow ? '0 0 0 2px #ff5de8,0 0 0 4px rgba(94,216,255,.7),0 0 10px 3px rgba(141,255,122,.35)' : '0 0 0 2px ' + T.color;
+    return '<canvas data-pid="' + id + '" data-size="' + size + '" style="box-shadow:' + ring + (extra || '') + '"></canvas>';
   }
   function skillText(sk) {
     var fx = sk.fx !== 'none' ? ' · ' + C.PROC_FX[sk.fx](sk.v) : '';
@@ -54,7 +57,7 @@
     this.pointer = null;
     this.els = {};
     ['hudWave', 'hudWaveMax', 'hudMode', 'hudEnemies', 'hudEnemyBar', 'hudRemain', 'hudTime', 'hudTimeLbl', 'hudBoss', 'hudBossTime',
-      'waveCard', 'eventCard', 'squadCard', 'statCard', 'logCard', 'field', 'missionCard', 'incidentCard', 'quickCraft', 'profileCard',
+      'waveCard', 'eventCard', 'squadCard', 'statCard', 'logCard', 'field', 'unitSheet', 'mTabLeftTxt', 'mTabRightTxt', 'mTabRight', 'missionCard', 'incidentCard', 'quickCraft', 'profileCard',
       'gold', 'tickets', 'summonCostLbl', 'mergeLbl', 'craftLbl', 'sellLbl', 'actSummon', 'actSummon10', 'actDesignated', 'actMerge', 'actCraft',
       'kickoff', 'kickoffTime', 'toasts', 'banner', 'reveal', 'pausedMask', 'btnPause', 'modal', 'modalTitle', 'modalBody'
     ].forEach(function (k) { this.els[k] = $(k); }, this);
@@ -103,19 +106,22 @@
   U.renderCollage = function () {
     var box = $('titleCollage');
     var items = [
+      // 히든 4인(무지개 링) + 태초 레전드 2인
       ['messi', 50, 44, 34], ['ronaldo', 20, 20, 21], ['pele', 80, 20, 21], ['maradona', 20, 72, 21], ['beckenbauer', 80, 72, 21],
-      ['dembele', 50, 88, 13], ['yamal', 50, 5, 13]
+      ['cruyff', 50, 88, 13], ['di_stefano', 50, 5, 13]
     ];
     var html = '<div class="collage">';
     items.forEach(function (it) {
-      var def = BY_ID[it[0]], size = it[3], col = C.TIERS[def.tier].color;
-      html += '<canvas data-pid="' + it[0] + '" data-size="' + Math.round(size * 5.2) + '" style="left:' + (it[1] - size / 2) + '%;top:' + (it[2] - size / 2) + '%;width:' + size + '%;height:' + size + '%;box-shadow:0 0 0 4px ' + col + ',0 12px 40px rgba(0,0,0,.6)"></canvas>';
-      html += '<div class="cap" style="left:' + it[1] + '%;top:' + (it[2] + size / 2 + 1) + '%;color:' + col + '">' + esc(def.name) + '</div>';
+      var def = BY_ID[it[0]], size = it[3], T = C.TIERS[def.tier];
+      // 히든은 회전하는 무지개 링(.rb), 나머지는 등급 색 링
+      html += '<div class="cring' + (T.rainbow ? ' rb' : '') + '" style="left:' + (it[1] - size / 2) + '%;top:' + (it[2] - size / 2) + '%;width:' + size + '%;height:' + size + '%;' + (T.rainbow ? '' : 'background:' + T.color) + '">' +
+        '<canvas data-pid="' + it[0] + '" data-size="' + Math.round(size * 5.2) + '"></canvas></div>';
+      html += '<div class="cap' + (T.rainbow ? ' rb-text' : '') + '" style="left:' + it[1] + '%;top:' + (it[2] + size / 2 + 1) + '%;' + (T.rainbow ? '' : 'color:' + T.color) + '">' + esc(def.name) + '</div>';
     });
     html += '</div>';
     box.innerHTML = html;
     var list = box.querySelectorAll('canvas');
-    for (var i = 0; i < list.length; i++) { var c = list[i], st = c.style.width; paintPortrait(c); c.style.width = st; c.style.height = st; }
+    for (var i = 0; i < list.length; i++) { paintPortrait(list[i]); list[i].style.width = list[i].style.height = '100%'; }
   };
 
   /* ───────── 게임 화면 바인딩 ───────── */
@@ -127,8 +133,8 @@
     $('btnPause').addEventListener('click', function () { self.togglePause(); });
     $('btnMenu').addEventListener('click', function () { self.open('menu'); });
     $('btnKickoff').addEventListener('click', function () { var g = self.game(); if (g.s) g.skipIntermission(); self.app.audio.ui(); });
-    $('actSummon').addEventListener('click', function () { self.doSummon(1); });
-    $('actSummon10').addEventListener('click', function () { self.doSummon(10); });
+    this.bindHoldSummon($('actSummon'), 1);
+    this.bindHoldSummon($('actSummon10'), 10);
     $('actDesignated').addEventListener('click', function () { self.open('designated'); });
     $('actSell').addEventListener('click', function () { self.open('sell'); });
     $('actMerge').addEventListener('click', function () { self.doMergeAll(); });
@@ -139,11 +145,37 @@
       var b = e.target.closest('[data-craft]'); if (!b) return;
       self.doCraft(b.dataset.craft);
     });
-    $('profileCard').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]'); if (!b) return;
-      self.handleAct(b.dataset.act, b.dataset);
+    ['profileCard', 'unitSheet'].forEach(function (id) {
+      $(id).addEventListener('click', function (e) {
+        var b = e.target.closest('[data-act]'); if (!b) return;
+        self.handleAct(b.dataset.act, b.dataset);
+      });
     });
+    // 모바일: 배속 순환 버튼 · 정보 서랍
+    $('btnSpeedCycle').addEventListener('click', function () { var g = self.game(); if (g.s) self.setSpeed(g.s.speed >= 3 ? 1 : g.s.speed + 1); });
+    document.querySelectorAll('[data-drawer]').forEach(function (b) {
+      b.addEventListener('click', function () { self.toggleDrawer(self.drawer === b.dataset.drawer ? null : b.dataset.drawer); self.app.audio.ui(); });
+    });
+    document.querySelectorAll('[data-close-drawer]').forEach(function (b) {
+      b.addEventListener('click', function () { self.toggleDrawer(null); });
+    });
+    var mq = root.matchMedia ? root.matchMedia('(max-width: 960px)') : null;
+    this.mq = mq;
+    if (mq) {
+      var onMq = function () { self.toggleDrawer(null); self.renderProfile(true); };
+      if (mq.addEventListener) mq.addEventListener('change', onMq); else if (mq.addListener) mq.addListener(onMq);
+    }
     this.bindField();
+  };
+  U.isMobile = function () { return !!(this.mq && this.mq.matches); };
+  U.toggleDrawer = function (which) {
+    this.drawer = which;
+    var game = $('game');
+    toggle(game, 'drawer-left', which === 'left');
+    toggle(game, 'drawer-right', which === 'right');
+    toggle($('mTabLeft'), 'on', which === 'left');
+    toggle($('mTabRight'), 'on', which === 'right');
+    if (which) { this.dirty = true; this.logDirty = true; }
   };
 
   U.bindField = function () {
@@ -152,22 +184,29 @@
     cv.addEventListener('pointerdown', function (e) {
       var g = self.game(); if (!g.s) return;
       self.app.audio.unlock();
+      if (self.drawer) { self.toggleDrawer(null); self.pointer = null; return; } // 서랍이 열려 있으면 경기장 탭으로 닫기
       var p = pos(e), slot = self.app.renderer.slotAt(p.x, p.y), u = slot >= 0 ? g.unitAt(slot) : null;
-      self.pointer = { x: p.x, y: p.y, slot: slot, uid: u ? u.uid : null, id: e.pointerId };
+      self.pointer = { x: p.x, y: p.y, slot: slot, uid: u ? u.uid : null, id: e.pointerId, touch: e.pointerType === 'touch' };
       if (u) try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     });
     cv.addEventListener('pointermove', function (e) {
       var pt = self.pointer; if (!pt || pt.uid === null) return;
       var p = pos(e), r = self.app.renderer;
-      if (!r.drag && Math.hypot(p.x - pt.x, p.y - pt.y) > 7) r.drag = { uid: pt.uid, x: p.x, y: p.y, moved: true };
+      // 손가락 떨림을 드래그로 오인하지 않도록 터치는 판정 거리를 조금 더 크게
+      if (!r.drag && Math.hypot(p.x - pt.x, p.y - pt.y) > (pt.touch ? 10 : 6)) r.drag = { uid: pt.uid, x: p.x, y: p.y, moved: true };
       if (r.drag) { r.drag.x = p.x; r.drag.y = p.y; r.hoverSlot = r.slotAt(p.x, p.y); }
     });
     function end(e) {
       var pt = self.pointer, r = self.app.renderer, g = self.game(); self.pointer = null;
       if (!pt || !g.s) return;
       if (r.drag) {
+        // 드래그 이동은 선수를 선택하지 않는다 (정보 화면은 일반 클릭/탭에서만 열린다).
+        // 이미 정보 화면이 떠 있던 선수를 옮겼다면 새 위치에 맞춰 카드 위치만 다시 잡는다.
         var target = r.hoverSlot; r.drag = null; r.hoverSlot = -1;
-        if (target >= 0 && g.move(pt.uid, target)) { self.app.audio.ui(); self.select(pt.uid); }
+        if (target >= 0 && g.move(pt.uid, target)) {
+          self.app.audio.ui();
+          if (self.selected === pt.uid) self.renderProfile(true);
+        }
         return;
       }
       if (e.type === 'pointercancel') return;
@@ -207,6 +246,7 @@
     var g = this.game(); if (!g.s) return;
     g.s.speed = v;
     document.querySelectorAll('.speed [data-speed]').forEach(function (b) { b.classList.toggle('on', +b.dataset.speed === v); });
+    $('btnSpeedCycle').textContent = v + '×';
     this.app.audio.ui();
   };
   U.togglePause = function (force) {
@@ -224,15 +264,44 @@
   };
 
   /* ───────── 행동 ───────── */
+  // 성공하면 true (길게 누르기 반복 영입이 실패 시 멈추는 데 사용)
   U.doSummon = function (n) {
-    var g = this.game(); if (!g.s) return;
+    var g = this.game(); if (!g.s) return false;
     this.app.audio.unlock();
     var r = n === 1 ? g.summon() : this.runBatch(function () { return g.summonMany(n); });
-    if (r.error) { this.toast(r.error, 'err'); this.app.audio.error(); return; }
+    if (r.error) { this.toast(r.error, 'err'); this.app.audio.error(); return false; }
     if (n > 1) {
       var sold = r.results.filter(function (x) { return x.autoSold; }).length, best = r.results.reduce(function (a, b) { return b.tier > a.tier ? b : a; });
       this.toast('영입 ' + r.results.length + '회 · 최고 ' + C.TIERS[best.tier].name + ' ' + BY_ID[best.id].name + (sold ? ' · 자동 판매 ' + sold : '') + (r.stopped ? ' (' + r.stopped + ')' : ''), 'ok');
     } else if (r.autoSold) this.log(BY_ID[r.id].name + ' 자동 판매 +' + r.autoSaleGold, 'info');
+    return true;
+  };
+
+  /* 영입 버튼(1회 · 10회): 누르는 순간 n회 영입, 계속 누르고 있으면 2초마다 n회씩 반복 영입.
+     손을 떼거나 버튼 밖으로 벗어나면 멈추고, 골드 · 빈칸이 부족해 실패하면 자동으로 멈춘다. */
+  var HOLD_SUMMON_MS = 2000;
+  U.bindHoldSummon = function (btn, n) {
+    var self = this, timer = null, pressed = false, upAt = 0;
+    function stopTimer() {
+      if (timer) { clearInterval(timer); timer = null; }
+      btn.classList.remove('holding');
+    }
+    function release() { if (timer || pressed) upAt = performance.now(); stopTimer(); }
+    btn.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || btn.disabled) return;
+      stopTimer(); pressed = true; upAt = 0;
+      if (!self.doSummon(n)) return;
+      btn.classList.add('holding');
+      timer = setInterval(function () { if (btn.disabled || !self.doSummon(n)) stopTimer(); }, HOLD_SUMMON_MS);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { btn.addEventListener(ev, release); });
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); }); // 모바일 길게 누르기 메뉴 방지
+    // 포인터로 누른 뒤 따라오는 click 은 이미 처리했으므로 무시한다 (손을 뗀 지 1초 이내).
+    // 키보드(Enter · Space) 처럼 포인터 없이 발생한 click 만 여기서 영입한다.
+    btn.addEventListener('click', function () {
+      if (pressed && performance.now() - upAt < 1000) { pressed = false; return; }
+      pressed = false; self.doSummon(n);
+    });
   };
   U.doMergeAll = function () {
     var g = this.game(); if (!g.s) return;
@@ -255,7 +324,7 @@
         u = g.s && g.unitById(this.selected); if (!u) return;
         var def = BY_ID[u.id];
         var doSell = function () { r = g.sell(u.uid); if (r.error) { self.toast(r.error, 'err'); return; } self.toast(def.name + ' 판매 +' + r.gold + ' 골드', 'info'); self.select(null); };
-        if (def.tier >= 4) this.confirm('선수 판매', C.TIERS[def.tier].name + ' 등급 ' + def.name + ' 선수를 ' + g.sellValue(u) + ' 골드에 판매할까요?', '판매', doSell); else doSell();
+        if (def.tier >= 4) this.confirm('선수 판매', C.TIERS[def.tier].name + ' 등급 ' + def.name + ' 선수를 ' + g.sellValue(u) + ' 골드에 판매할까요?', '판매', doSell, true); else doSell();
         break;
       case 'unit-lock':
         u = g.s && g.unitById(this.selected); if (!u) return;
@@ -269,6 +338,9 @@
       case 'unit-detail':
         u = g.s && g.unitById(this.selected); if (!u) return;
         this.open('player', { id: u.id, uid: u.uid });
+        break;
+      case 'unit-close':
+        this.select(null);
         break;
     }
   };
@@ -284,6 +356,7 @@
     if (this.panelClock >= 0.25) {
       this.panelClock = 0;
       this.renderMission(); this.renderStats();
+      if (this.isMobile()) this.renderStrip();
       if (this.logDirty) { this.logDirty = false; this.renderLog(); }
       if (this.dirty) { this.dirty = false; this.renderLeft(); this.renderQuick(); this.renderProfile(true); this.updateMergeable(); if (this.modalName && this.modalLive) this.refreshModal(); }
     }
@@ -356,10 +429,10 @@
     var sq = '<div class="card-h">스쿼드 <small>배치 ' + s.units.length + ' / ' + C.SLOT_COUNT + '</small></div><div class="squad-grid">';
     for (var t = 0; t < 9; t++) {
       if (!counts[t] && t >= 5) continue;
-      sq += '<div style="border-color:' + C.TIERS[t].color + '44"><span style="color:' + C.TIERS[t].color + '">' + C.TIERS[t].name + '</span><b>' + counts[t] + '</b></div>';
+      sq += '<div style="border-color:' + C.TIERS[t].color + '44">' + tierText(t) + '<b>' + counts[t] + '</b></div>';
     }
     sq += '</div>';
-    var ups = s.upgrades.map(function (lv, t) { return lv ? '<span class="chip" style="color:' + C.TIERS[t].color + '">' + C.TIERS[t].name + ' +' + lv + '</span>' : ''; }).join('');
+    var ups = s.upgrades.map(function (lv, t) { return lv ? '<span class="chip">' + tierText(t) + ' +' + lv + '</span>' : ''; }).join('');
     if (ups) sq += '<div class="chips" style="margin-top:8px">' + ups + '</div>';
     var tm = g.team;
     var teamFx = [];
@@ -405,6 +478,21 @@
     }
   };
 
+  // 모바일 정보 띠: 서랍을 열지 않아도 임무 · 돌발 상황 · 조합 가능 · 웨이브 요약이 보인다
+  U.renderStrip = function () {
+    var g = this.game(), s = g.s, m = s.mission, inc = s.incident, e = this.els, txt;
+    var incOn = inc && !inc.done && !inc.failed;
+    if (incOn) txt = '⚠ ' + inc.name + ' ' + Math.ceil(inc.remaining) + '초';
+    else if (m) txt = m.name + ' ' + fmt(Math.min(m.progress, m.target)) + '/' + fmt(m.target) + (m.done ? ' ✔' : m.failed ? ' ✖' : '');
+    else txt = '킥오프 후 임무 시작';
+    var craft = g.craftable(true).length;
+    if (craft) txt = '🧪 조합 ' + craft + ' · ' + txt;
+    setText(e.mTabRightTxt, txt);
+    toggle(e.mTabRight, 'alert', !!incOn);
+    var count = s.phase === 'wave' ? g.waveEnemyCount() : 0;
+    setText(e.mTabLeftTxt, 'W' + Math.max(1, s.wave) + (g.wd.boss && s.phase === 'wave' ? ' 보스' : '') + ' · 남은 적 ' + Math.max(0, count - s.spawned) + ' · ' + s.units.length + '/48');
+  };
+
   U.renderQuick = function () {
     var g = this.game(), list = g.craftable(true), meta = this.app.meta;
     if (!list.length) { setHTML(this.els.quickCraft, '<div class="empty">재료가 모이면 여기에 표시됩니다.<br><small>조합하기에서 전체 조합식을 확인하세요.</small></div>'); return; }
@@ -419,7 +507,10 @@
   U.renderProfile = function (force) {
     var g = this.game(), el = this.els.profileCard;
     var u = this.selected !== null && g.s ? g.unitById(this.selected) : null;
-    if (!u) { if (this.selected !== null) { this.selected = null; this.app.renderer.selected = null; } setHTML(el, '<div class="card-h">선수 정보</div><div class="empty">경기장의 선수를 클릭하세요.<br>드래그로 위치를 바꿀 수 있어요.</div>'); return; }
+    if (!u && this.selected !== null) { this.selected = null; this.app.renderer.selected = null; }
+    var mobile = this.isMobile();
+    this.renderSheet(mobile ? u : null, force);
+    if (!u || mobile) { el._uid = null; setHTML(el, '<div class="card-h">선수 정보</div><div class="empty">경기장의 선수를 클릭하세요.<br>드래그로 위치를 바꿀 수 있어요.</div>'); return; }
     var def = BY_ID[u.id], p = g.power(u), same = g.s.units.filter(function (x) { return x.id === u.id && !x.locked; }).length;
     var canMerge = def.tier <= C.MERGE_MAX_TIER && same >= 3;
     if (!force && el._uid === u.uid) {
@@ -438,6 +529,43 @@
       '<button type="button" class="btn small" data-act="unit-merge"' + (canMerge && !u.locked ? '' : ' disabled') + '>합성 (' + Math.min(same, 3) + '/3)</button>' +
       '<button type="button" class="btn small" data-act="unit-detail">상세 정보</button></div>';
     setHTML(el, h); hydrate(el);
+  };
+  /* 모바일 선수 정보 카드 — 경기장 위에 겹쳐 띄워 스크롤 없이 보여준다.
+     선수가 화면 아래쪽에 있으면 카드를 위에, 위쪽에 있으면 아래에 둬서 선수를 가리지 않는다. */
+  U.renderSheet = function (u, force) {
+    var el = this.els.unitSheet, field = this.els.field, g = this.game();
+    if (!u) {
+      if (el._uid !== null) { el._uid = null; toggle(el, 'hidden', true); field.classList.remove('sheet-top', 'sheet-bottom'); }
+      return;
+    }
+    var def = BY_ID[u.id], p = g.power(u);
+    if (force || el._uid !== u.uid) {
+      el._uid = u.uid;
+      var same = g.s.units.filter(function (x) { return x.id === u.id && !x.locked; }).length;
+      var canMerge = def.tier <= C.MERGE_MAX_TIER && same >= 3;
+      var h = '<div class="us-h">' + pc(u.id, 44) + '<div class="us-t"><div class="nm">' + esc(def.name) + '</div><div class="chips">' + tierTag(def.tier) + styleChip(def.style) + '<span class="chip" style="color:' + C.POSITIONS[def.pos].color + '">' + def.pos + '</span></div></div>' +
+        '<button type="button" class="x" data-act="unit-close" aria-label="닫기">✕</button></div>';
+      h += '<div class="us-stats" data-live>' + this.sheetStats(u, p) + '</div>';
+      h += '<div class="us-skill">' + (def.passive ? '<b>◆ ' + esc(def.passive.name) + '</b> ' + esc(def.passive.desc) + ' ' : '') + '<b>★ ' + esc(def.skill.name) + '</b> ' + esc(skillText(def.skill)) + '</div>';
+      h += '<div class="us-btns">' +
+        '<button type="button" class="btn" data-act="unit-sell"' + (u.locked ? ' disabled' : '') + '>판매 +' + g.sellValue(u) + '</button>' +
+        '<button type="button" class="btn" data-act="unit-lock">' + (u.locked ? '잠금 해제' : '🔒 잠금') + '</button>' +
+        '<button type="button" class="btn" data-act="unit-merge"' + (canMerge && !u.locked ? '' : ' disabled') + '>합성 ' + Math.min(same, 3) + '/3</button>' +
+        '<button type="button" class="btn" data-act="unit-detail">자세히</button></div>';
+      el.innerHTML = h; hydrate(el);
+      toggle(el, 'hidden', false);
+    } else {
+      var live = el.querySelector('[data-live]'); if (live) live.innerHTML = this.sheetStats(u, p);
+    }
+    var sc = this.app.renderer.slotScreen(u.slot), top = sc.y > sc.h * 0.5;
+    toggle(el, 'top', top);
+    toggle(field, 'sheet-top', top); toggle(field, 'sheet-bottom', !top);
+    field.style.setProperty('--sheet-h', el.offsetHeight + 'px');
+  };
+  U.sheetStats = function (u, p) {
+    var cell = function (k, v) { return '<div><small>' + k + '</small><b>' + v + '</b></div>'; };
+    return cell('공격력', fmt(p.damage)) + cell('공격속도', p.rate.toFixed(2) + '/s') + cell('사거리', p.range.toFixed(1)) +
+      cell('치명타', Math.round(Math.min(0.95, p.crit) * 100) + '%') + cell('누적 피해', fmt(u.dealt)) + cell('공격', esc(C.ROLES[BY_ID[u.id].role].name));
   };
   U.liveStats = function (u, p) {
     return '<div class="kv"><span>공격력</span><b>' + fmt(p.damage) + '</b></div>' +
@@ -515,8 +643,8 @@
   U.reveal = function (def, label) {
     var r = this.els.reveal, col = C.TIERS[def.tier].color;
     r.className = 'reveal' + (def.hidden ? ' hidden-tier' : '');
-    r.style.borderColor = col;
-    r.innerHTML = pc(def.id, 64) + '<div><div class="rt" style="color:' + col + '">' + esc(label) + '</div><div class="rn">' + esc(def.name) + '</div><div class="rs">' + esc(def.nick) + ' · ' + esc(F.CLUBS[def.club].name) + '</div></div>';
+    r.style.borderColor = def.hidden ? '' : col;
+    r.innerHTML = pc(def.id, 64) + '<div><div class="rt' + (def.hidden ? ' rb-text' : '') + '" style="' + (def.hidden ? '' : 'color:' + col) + '">' + esc(label) + '</div><div class="rn">' + esc(def.name) + '</div><div class="rs">' + esc(def.nick) + ' · ' + esc(F.CLUBS[def.club].name) + '</div></div>';
     hydrate(r);
     this.revealTimer = def.hidden ? 3.2 : 2.2;
   };
@@ -525,7 +653,7 @@
   U.onEvent = function (type, a, b, c, d) {
     var g = this.game(), au = this.app.audio, def;
     switch (type) {
-      case 'start': this.dirty = true; this.logs = []; this.logDirty = true; this.els.toasts.innerHTML = ''; this.select(null); break;
+      case 'start': this.dirty = true; this.autoPaused = false; this.logs = []; this.logDirty = true; this.els.toasts.innerHTML = ''; this.toggleDrawer(null); this.select(null); break;
       case 'change': this.dirty = true; break;
       case 'wave':
         this.dirty = true;
@@ -555,10 +683,9 @@
       case 'incidentend': if (a) { au.coin(); this.toast('돌발 상황 해결! +' + b + ' 골드', 'ok'); } else this.toast('돌발 상황 실패', 'err'); break;
       case 'draw':
         this.app.renderer.onSpawnUnit(a); au.summon(b.tier);
-        if (c) this.showReveal(b, '★ HIDDEN · 레전드 강림!');
-        else if (d) this.showReveal(b, '지정 영입 · 전설');
+        if (d) this.showReveal(b, '지정 영입 · 전설');
         else if (b.tier >= 4) this.showReveal(b, C.TIERS[b.tier].name + ' 영입!');
-        if (c || b.tier >= 4) this.log((c ? '★ 히든 ' : C.TIERS[b.tier].name + ' ') + '영입 · ' + b.name, 'ok');
+        if (b.tier >= 4) this.log(C.TIERS[b.tier].name + ' 영입 · ' + b.name, 'ok');
         break;
       case 'merge':
         this.app.renderer.onSpawnUnit(a); au.merge();
@@ -597,8 +724,15 @@
     });
   };
 
+  /* opts.pause: 창이 열려 있는 동안 경기를 일시정지하고, 닫으면 재개한다.
+     (모바일에서는 창이 경기장을 가려 대응하기 어려우므로 판매 · 조합 · 메뉴에 사용. PC 도 동일)
+     창을 열기 전에 이미 직접 일시정지해 둔 경우에는 닫아도 계속 정지 상태로 둔다. */
   U.showModal = function (name, title, html, opts) {
     opts = opts || {};
+    if (opts.pause) {
+      var g = this.game();
+      if (g.s && g.active() && !g.s.paused) { this.togglePause(true); this.autoPaused = true; }
+    }
     this.modalName = name; this.modalLive = !!opts.live; this.modalLocked = !!opts.locked;
     setText(this.els.modalTitle, title);
     this.els.modalBody.innerHTML = html;
@@ -609,7 +743,7 @@
     if (!opts.keepScroll) this.els.modalBody.scrollTop = 0;
   };
   U.closeModal = function () {
-    if (this.modalName === 'menu' && this.menuPaused) { this.menuPaused = false; this.togglePause(false); }
+    if (this.autoPaused) { this.autoPaused = false; this.togglePause(false); }
     this.modalName = null; this.modalLive = false; this.modalLocked = false;
     toggle(this.els.modal, 'hidden', true);
     this.els.modalBody.innerHTML = '';
@@ -621,9 +755,9 @@
     this.els.modalBody.scrollTop = top;
   };
 
-  U.confirm = function (title, text, okLabel, onOk) {
+  U.confirm = function (title, text, okLabel, onOk, pause) {
     this._confirmOk = onOk;
-    this.showModal('confirm', title, '<p>' + esc(text) + '</p><div class="btn-row"><button type="button" class="btn" data-m="confirm-no">취소</button><button type="button" class="btn primary" data-m="confirm-yes">' + esc(okLabel) + '</button></div>', { narrow: true });
+    this.showModal('confirm', title, '<p>' + esc(text) + '</p><div class="btn-row"><button type="button" class="btn" data-m="confirm-no">취소</button><button type="button" class="btn primary" data-m="confirm-yes">' + esc(okLabel) + '</button></div>', { narrow: true, pause: !!pause });
   };
 
   U.open = function (name, state, refresh) {
@@ -638,7 +772,7 @@
   U.modal_codex = function (st) {
     var meta = this.app.meta, tab = st.tab === undefined ? 'all' : st.tab;
     var h = '<div class="tabs"><button type="button" data-m="codex-tab" data-tab="all" class="' + (tab === 'all' ? 'on' : '') + '">전체 ' + meta.unlocked.length + '/' + F.PLAYERS.length + '</button>';
-    for (var t = 8; t >= 0; t--) h += '<button type="button" data-m="codex-tab" data-tab="' + t + '" class="' + (String(tab) === String(t) ? 'on' : '') + '" style="color:' + C.TIERS[t].color + '">' + C.TIERS[t].name + '</button>';
+    for (var t = 8; t >= 0; t--) h += '<button type="button" data-m="codex-tab" data-tab="' + t + '" class="' + (String(tab) === String(t) ? 'on' : '') + '">' + tierText(t) + '</button>';
     h += '</div><div class="grid-cards">';
     F.PLAYERS.filter(function (p) { return tab === 'all' || String(p.tier) === String(tab); })
       .sort(function (a, b) { return b.tier - a.tier || (a.rank || 99) - (b.rank || 99); })
@@ -647,7 +781,7 @@
         h += '<div class="pc ' + (got ? '' : 'locked') + '" data-m="player" data-id="' + p.id + '">' + pc(p.id, 64) + (got ? '' : '<span class="q">?</span>') +
           '<div class="nm">' + esc(p.name) + '</div><div class="sub">' + tierTag(p.tier) + ' ' + C.POSITIONS[p.pos].short + (p.rank ? ' · ' + p.rank + '위' : ' · 레전드') + '</div></div>';
       });
-    h += '</div><p class="hint" style="margin-top:12px">등급은 The Guardian 2025 순위 기반입니다 (메시 34위·호날두 51위는 히든으로 분리, 52위 찰하놀루 편입). 한 번이라도 획득하면 사진이 공개됩니다.</p>';
+    h += '</div><p class="hint" style="margin-top:12px">신화 이하는 The Guardian 2025 순위 기반입니다 (메시 34위·호날두 51위는 히든으로 분리, 52위 찰하놀루 편입). 초월 7인 · 태초 11인은 역대 레전드입니다. 한 번이라도 획득하면 사진이 공개됩니다.</p>';
     this.showModal('codex', '📖 선수 도감', h);
   };
 
@@ -656,10 +790,12 @@
     var bs = baseStats(def), role = C.ROLES[def.role], style = C.STYLES[def.style], cr = (F.PHOTO_CREDITS || {})[def.id];
     var live = st.uid && g.s ? g.unitById(st.uid) : null, p = live ? g.power(live) : null;
     var h = '<div class="detail"><div class="big-portrait">' + pc(def.id, 200, ',0 16px 40px rgba(0,0,0,.5)') + '</div><div>';
-    h += '<div class="chips">' + tierTag(def.tier) + styleChip(def.style) + posChip(def.pos) + (def.hidden ? '<span class="chip" style="color:var(--gold)">★ 히든</span>' : '') + '</div>';
+    h += '<div class="chips">' + tierTag(def.tier) + styleChip(def.style) + posChip(def.pos) + (def.hidden ? '<span class="chip rb-chip"><span class="rb-text">★ 히든 레전드</span></span>' : '') + '</div>';
     h += '<h3 style="margin-top:6px">' + esc(def.name) + '</h3><div class="en">' + esc(def.en) + ' · "' + esc(def.nick) + '"</div>';
     h += '<div class="kv"><span>소속 · 국적</span><b>' + esc(F.CLUBS[def.club].name) + ' · ' + esc(def.nation) + '</b></div>';
-    h += '<div class="kv"><span>' + (def.legend ? '생몰' : '나이') + ' · 가디언 순위</span><b>' + (def.legend ? esc(def.legend) : def.age + '세') + ' · ' + (def.rank ? def.rank + '위' : '역대 레전드') + '</b></div>';
+    // 레전드: '1945–2024'(생몰) 또는 '1972–'(생존). 현역: 나이 · 가디언 순위
+    var legendAlive = def.legend && /–$/.test(def.legend);
+    h += '<div class="kv"><span>' + (def.legend ? (legendAlive ? '출생' : '생몰') : '나이') + ' · 가디언 순위</span><b>' + (def.legend ? esc(legendAlive ? def.legend.replace('–', '년생') : def.legend) : def.age + '세') + ' · ' + (def.rank ? def.rank + '위' : '역대 레전드') + '</b></div>';
     h += '<p class="desc" style="color:#cfd9e6">' + esc(def.trait) + '</p>';
     h += '<div class="stat-grid"><div><small>' + (p ? '현재 공격력' : '기본 공격력') + '</small><b>' + fmt(p ? p.damage : bs.damage) + '</b></div><div><small>공격속도</small><b>' + (p ? p.rate : bs.rate).toFixed(2) + '/초</b></div><div><small>사거리</small><b>' + (p ? p.range : bs.range).toFixed(1) + '</b></div><div><small>치명타</small><b>' + Math.round(Math.min(0.95, p ? p.crit : bs.crit) * 100) + '%</b></div></div>';
     h += '<div class="box"><div class="h">⚽ 기본 공격 · ' + esc(role.name) + '</div>' + esc(role.desc) + (role.mode !== 'single' ? ' (최대 ' + role.targets + '명)' : '') + '</div>';
@@ -674,7 +810,7 @@
         : '<div class="hint">재료 비공개 · 아직 발견하지 못한 조합입니다.</div>';
       h += '</div>';
     }
-    if (def.hidden) h += '<div class="box"><div class="h">획득 방법</div>영입 시 ' + Number((g.hiddenChance() * 100).toFixed(4)) + '% 확률로 등장하거나, 비밀 조합으로 확정 획득합니다.</div>';
+    if (def.hidden) h += '<div class="box"><div class="h">획득 방법</div>영입으로는 등장하지 않으며, 비밀 조합으로만 획득할 수 있습니다.</div>';
     else {
       var ways = [];
       var sw = C.SUMMON_WEIGHTS[def.tier];
@@ -772,9 +908,9 @@
   U.modal_help = function () {
     var h = '<div class="help">' +
       '<h4>목표</h4><p>원정 군단이 경기장 트랙을 끝없이 돕니다. <b>경기장에 적이 150명을 넘으면 패배</b>, 5웨이브마다 등장하는 <b>보스를 120초 안에 쓰러뜨리지 못해도 패배</b>입니다. 정규 모드는 40웨이브를 버티면 우승하고 무한 모드가 열립니다.</p>' +
-      '<h4>영입 (소환)</h4><p>45골드(또는 영입권)로 무작위 선수를 영입합니다. 확률 — 노멀 49.9% · 레어 28% · 유니크 14% · 에픽 6% · 전설 1.57% · 신화 0.43% · 초월 0.1% · <b>히든 0.03%</b>. 태초 등급은 조합으로만 얻습니다. 3,000골드로 원하는 전설 선수를 지정 영입할 수도 있습니다.</p>' +
-      '<h4>합성 · 조합</h4><p><b>같은 선수 3명</b>(에픽 이하)을 합성하면 한 단계 위 등급의 무작위 선수가 됩니다. <b>조합</b>은 소속팀·대표팀 인연이 있는 특정 선수들을 모아 원하는 상위 선수를 확정으로 만듭니다. 히든 레전드 5인은 <b>비밀 조합</b>으로도 얻을 수 있지만 재료는 공개되지 않아요. 알맞은 선수들이 경기장에 모이면 「조합 가능」에 나타납니다.</p>' +
-      '<h4>배치</h4><p>선수는 트랙 가까운 칸부터 배치됩니다. 드래그로 위치를 바꾸세요. 사거리가 짧은 드리블러·수비수는 트랙 옆에, 사거리가 긴 피니셔·중거리 슈터는 안쪽에 두는 것이 좋습니다. 패스 스타일은 주변 아군 공격속도를, 리더십 스타일은 주변 아군 공격력을 올려 줍니다.</p>' +
+      '<h4>영입 (소환)</h4><p>45골드(또는 영입권)로 무작위 선수를 영입합니다. 확률 — 노멀 49.9% · 레어 28% · 유니크 14% · 에픽 6% · 전설 1.57% · 신화 0.43% · 초월 0.1%. 초월(지단 · 반 바스텐 등 레전드 7인)은 영입 · 조합으로, 태초(베켄바우어 · 크루이프 등 레전드 11인)는 조합으로만, <b>히든 레전드 4인(메시 · 호날두 · 펠레 · 마라도나)은 비밀 조합으로만</b> 얻습니다. 영입 버튼을 길게 누르고 있으면 2초마다 자동으로 영입합니다. 3,000골드로 원하는 전설 선수를 지정 영입할 수도 있습니다.</p>' +
+      '<h4>합성 · 조합</h4><p><b>같은 선수 3명</b>(에픽 이하)을 합성하면 한 단계 위 등급의 무작위 선수가 됩니다. <b>조합</b>은 소속팀·대표팀 인연이 있는 특정 선수들을 모아 원하는 상위 선수를 확정으로 만듭니다. 히든 레전드 4인은 <b>비밀 조합</b>으로만 얻을 수 있고 재료는 공개되지 않아요. 알맞은 선수들이 경기장에 모이면 「조합 가능」에 나타납니다.</p>' +
+      '<h4>배치</h4><p>영입한 선수는 화면 맨 윗줄 · 맨 왼쪽 칸부터 차례로 배치됩니다. 드래그로 위치를 바꾸세요(일시정지 중에도 가능). 사거리가 짧은 드리블러·수비수는 트랙 옆에, 사거리가 긴 피니셔·중거리 슈터는 안쪽에 두는 것이 좋습니다. 패스 스타일은 주변 아군 공격속도를, 리더십 스타일은 주변 아군 공격력을 올려 줍니다.</p>' +
       '<h4>선수 능력</h4><ul><li><b>기본 공격</b>: 포지션에 따른 공격 방식(피니셔·드리블러·플레이메이커·윙백·골키퍼 등)</li><li><b>플레이 스타일</b>: 결정력·드리블·스피드·패스·강슛·제공권·태클·압박·체력·리더십·빅게임·선방·세트피스</li><li><b>확률 스킬</b>: 공격할 때마다 확률로 발동하는 선수 고유 기술</li><li><b>패시브</b>: 전설 이상 선수의 고유 능력 (예: 뎀벨레의 양발 공격, 메시의 팀 전체 버프)</li></ul>' +
       '<h4>경제</h4><p>적 처치·웨이브 보상·긴급 임무로 골드를 얻습니다. <b>등급 강화</b>는 해당 등급 선수 전체의 공격력(단계당 ×1.23)·공속·사거리·치명을 올립니다. 필요 없는 등급은 일괄 판매하거나 자동 판매를 켜세요.</p>' +
       '<h4>트로피 캐비닛</h4><p>웨이브를 클리어할 때마다 트로피 토큰을 얻고, 캐비닛에서 트로피를 뽑아 영구 능력치를 올릴 수 있습니다.</p>' +
@@ -785,7 +921,7 @@
   /* 사진 출처 */
   U.modal_credits = function () {
     var cr = F.PHOTO_CREDITS || {};
-    var h = '<p class="hint">선수 명단: <a href="https://www.theguardian.com/football/ng-interactive/2025/dec/16/the-100-best-male-footballers-in-the-world-2025" target="_blank" rel="noopener">The Guardian — The 100 best male footballers in the world 2025</a> (1~50위, 메시 제외 · 52위 찰하놀루 편입). 게임 방식 모티브: 랜덤 과학 인물 디펜스.</p>';
+    var h = '<p class="hint">선수 명단: <a href="https://www.theguardian.com/football/ng-interactive/2025/dec/16/the-100-best-male-footballers-in-the-world-2025" target="_blank" rel="noopener">The Guardian — The 100 best male footballers in the world 2025</a> (1~50위, 메시 제외 · 52위 찰하놀루 편입 → 신화 이하 등급). 초월 · 태초 · 히든은 역대 레전드. 게임 방식 모티브: 랜덤 과학 인물 디펜스.</p>';
     h += '<p class="hint">선수 사진은 모두 위키미디어 공용(Wikimedia Commons)의 자유 라이선스 이미지이며, 각 저작자와 라이선스는 아래와 같습니다. 원형으로 잘라 사용했습니다.</p>';
     h += '<div style="overflow-x:auto"><table class="table"><tr><th></th><th>선수</th><th>저작자</th><th>라이선스</th><th>원본</th></tr>';
     F.PLAYERS.forEach(function (p) {
@@ -809,7 +945,7 @@
     h += '<button type="button" data-m="auto-sell" data-t="-1" class="' + (s.autoSellTier === null ? 'on' : '') + '">끄기</button>';
     for (var k = 0; k <= 4; k++) h += '<button type="button" data-m="auto-sell" data-t="' + k + '" class="' + (s.autoSellTier === k ? 'on' : '') + '">' + C.TIERS[k].name + ' 이하</button>';
     h += '</div><p class="hint">판매 가격: ' + C.SELL_VALUES.slice(0, 9).map(function (v, i) { return C.TIERS[i].name + ' ' + Math.round(v * (1 + g.fx.sellBonus)); }).join(' · ') + '</p>';
-    this.showModal('sell', '등급 판매', h, { narrow: true, live: true });
+    this.showModal('sell', '등급 판매', h, { narrow: true, live: true, pause: true });
   };
 
   /* 인게임: 강화 */
@@ -829,7 +965,7 @@
   U.modal_craft = function (st) {
     var g = this.game(), meta = this.app.meta, tab = st.tab === undefined ? 5 : +st.tab;
     var h = '<p class="hint" style="margin-top:0">신화 = 전설 3 · 초월 = 신화 2 + 전설 1 · 태초 = 초월 2 + 신화 2 · 히든 = 비밀 조합 (전설은 영입 · 합성 · 지정 영입으로 획득)</p><div class="tabs">';
-    [5, 6, 7, 8].forEach(function (t) { h += '<button type="button" data-m="craft-tab" data-tab="' + t + '" class="' + (tab === t ? 'on' : '') + '" style="color:' + C.TIERS[t].color + '">' + C.TIERS[t].name + (t === 8 ? ' (비밀)' : '') + '</button>'; });
+    [5, 6, 7, 8].forEach(function (t) { h += '<button type="button" data-m="craft-tab" data-tab="' + t + '" class="' + (tab === t ? 'on' : '') + '">' + tierText(t) + (t === 8 ? ' (비밀)' : '') + '</button>'; });
     h += '</div><div class="list">';
     F.RECIPES.filter(function (r) { return BY_ID[r.id].tier === tab; }).forEach(function (r) {
       var def = BY_ID[r.id], stt = g.recipeStatus(r.id), known = !r.secret || meta.discovered.indexOf(r.id) >= 0, ready = stt.ok;
@@ -842,7 +978,7 @@
       h += '</div><button type="button" class="btn small ' + (ready ? 'primary' : '') + '" data-m="craft" data-id="' + r.id + '"' + (ready ? '' : ' disabled') + '>조합</button></div>';
     });
     h += '</div><p class="hint" style="margin-top:10px">재료는 경기장에 배치된 잠기지 않은 선수에서 소모됩니다. 결과 선수는 첫 번째 재료 자리에 배치됩니다.</p>';
-    this.showModal('craft', '🧪 조합하기', h, { live: true, keepScroll: true });
+    this.showModal('craft', '🧪 조합하기', h, { live: true, keepScroll: true, pause: true });
   };
 
   /* 인게임: 지정 영입 */
@@ -860,7 +996,6 @@
   /* 인게임 메뉴 */
   U.modal_menu = function () {
     var g = this.game(); if (!g.s) return;
-    if (!g.s.paused && g.active()) { this.togglePause(true); this.menuPaused = true; }
     var h = '<div class="list">' +
       '<button type="button" class="btn big primary" data-m="menu-resume">▶ 계속하기</button>' +
       '<button type="button" class="btn" data-m="menu-open" data-name="codex">📖 선수 도감</button>' +
@@ -868,7 +1003,7 @@
       '<button type="button" class="btn" data-m="menu-open" data-name="settings">⚙️ 설정</button>' +
       '<button type="button" class="btn" data-m="menu-title">💾 저장 후 타이틀로</button>' +
       '<button type="button" class="btn danger" data-m="menu-forfeit">🏳️ 경기 포기</button></div>';
-    this.showModal('menu', '일시정지 메뉴', h, { narrow: true });
+    this.showModal('menu', '일시정지 메뉴', h, { narrow: true, pause: true });
   };
 
   /* 결과 */
@@ -936,10 +1071,10 @@
         });
         break;
       case 'menu-resume': this.closeModal(); break;
-      case 'menu-open': this.menuPaused = this.menuPaused && d.name !== 'relics'; this.open(d.name); break;
-      case 'menu-title': this.menuPaused = false; this.closeModal(); this.app.toTitle(true); break;
+      case 'menu-open': this.open(d.name); break; // 메뉴에서 연 창을 닫을 때 재개된다
+      case 'menu-title': this.autoPaused = false; this.closeModal(); this.app.toTitle(true); break; // 일시정지 상태로 저장
       case 'menu-forfeit':
-        this.confirm('경기 포기', '경기를 포기하면 지금까지의 기록으로 결과가 정산됩니다.', '포기', function () { self.menuPaused = false; g.s.paused = false; toggle(self.els.pausedMask, 'hidden', true); g.gameOver('forfeit'); });
+        this.confirm('경기 포기', '경기를 포기하면 지금까지의 기록으로 결과가 정산됩니다.', '포기', function () { g.s.paused = false; toggle(self.els.pausedMask, 'hidden', true); self.els.btnPause.textContent = '❚❚'; g.gameOver('forfeit'); });
         break;
       case 'result-retry': var s = g.s, mode = s.mode, diff = s.difficulty; this.closeModal(); this.app.startGame(mode, diff); break;
       case 'result-title': this.closeModal(); this.app.toTitle(false); break;

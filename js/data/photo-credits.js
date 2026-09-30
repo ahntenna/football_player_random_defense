@@ -552,6 +552,204 @@
   "license": "CC BY-SA 3.0",
   "source": "https://commons.wikimedia.org/wiki/File:AUT_vs._TUR_2016-03-29_(342).jpg"
  },
+ "zidane": {
+  "file": "assets/players/zidane.jpg",
+  "w": 410,
+  "h": 544,
+  "wiki": "Zinedine Zidane",
+  "desc": "French football player and manager (born 1972)",
+  "image": "Zinedine_Zidane_by_Tasnim_03.jpg",
+  "author": "Hadi Abyar",
+  "license": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Zinedine_Zidane_by_Tasnim_03.jpg"
+ },
+ "van_basten": {
+  "file": "assets/players/van_basten.jpg",
+  "w": 393,
+  "h": 524,
+  "wiki": "Marco van Basten",
+  "desc": "Dutch football player and manager (born 1964)",
+  "image": "Marco_van_Basten_(2)_(cropped).jpg",
+  "author": "Paul Blank",
+  "license": "CC BY 2.5",
+  "source": "https://commons.wikimedia.org/wiki/File:Marco_van_Basten_(2)_(cropped).jpg"
+ },
+ "ronaldo_nazario": {
+  "file": "assets/players/ronaldo_nazario.jpg",
+  "w": 420,
+  "h": 606,
+  "wiki": "Ronaldo (Brazilian footballer)",
+  "desc": "Brazilian footballer (born 1976)",
+  "image": "12.12.2025_–_Cerimônia_de_lançamento_do_SBT_News_-_54980664160_(cropped2).jpg",
+  "author": "Lula Oficial",
+  "license": "CC BY-SA 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:12.12.2025_%E2%80%93_Cerim%C3%B4nia_de_lan%C3%A7amento_do_SBT_News_-_54980664160_(cropped2).jpg"
+ },
+ "iniesta": {
+  "file": "assets/players/iniesta.jpg",
+  "w": 420,
+  "h": 532,
+  "wiki": "Andrés Iniesta",
+  "desc": "Spanish footballer (born 1984)",
+  "image": "Andrés_Iniesta_Argentina_v_Spain_19_July_2026-034_(cropped).jpg",
+  "author": "Bryan Berlin",
+  "license": "CC BY-SA 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Andr%C3%A9s_Iniesta_Argentina_v_Spain_19_July_2026-034_(cropped).jpg"
+ },
+ "matthaus": {
+  "file": "assets/players/matthaus.jpg",
+  "w": 420,
+  "h": 617,
+  "wiki": "Lothar Matthäus",
+  "desc": "German footballer (born 1961)",
+  "image": "2019_Lothar_Matthäus.jpg",
+  "author": "Steffen Prößdorf",
+  "license": "CC BY-SA 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:2019_Lothar_Matth%C3%A4us.jpg"
+ },
+ "xavi": {
+  "file": "assets/players/xavi.jpg",
+  "w": 452,
+  "h": 604,
+  "wiki": "Xavi (footballer, born 1980)",
+  "desc": "Spanish footballer and manager (born 1980)",
+  "image": "Xavi,_Persepolis_vs._Al_Sadd,_20190520_02_(cropped).jpg",
+  "author": "Meysam Mehabadi",
+  "license": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Xavi,_Persepolis_vs._Al_Sadd,_20190520_02_(cropped).jpg"
+ },
+ "henry": {
+  "file": "assets/players/henry.jpg",
+  "w": 420,
+  "h": 560,
+  "wiki": "Thierry Henry",
+  "desc": "French footballer (born 1977)",
+  "image": "Thierry_Henry_(51649035951)_(cropped).jpg",
+  "author": "Web Summit",
+  "license": "CC BY 2.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Thierry_Henry_(51649035951)_(cropped).jpg"
+ },
+ "beckenbauer": {
+  "file": "assets/players/beckenbauer.jpg",
+  "w": 420,
+  "h": 574,
+  "wiki": "Franz Beckenbauer",
+  "desc": "German footballer (1945–2024)",
+  "image": "Franz_Beckenbauer_(1975).jpg",
+  "author": "Panini Group",
+  "license": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Franz_Beckenbauer_(1975).jpg"
+ },
+ "yashin": {
+  "file": "assets/players/yashin.jpg",
+  "w": 420,
+  "h": 560,
+  "wiki": "Lev Yashin",
+  "desc": "Soviet footballer (1929–1990)",
+  "image": "LevYashin.JPG",
+  "author": "Kroon, Ron for Anefo",
+  "license": "CC BY-SA 3.0 nl",
+  "source": "https://commons.wikimedia.org/wiki/File:LevYashin.JPG"
+ },
+ "cruyff": {
+  "file": "assets/players/cruyff.jpg",
+  "w": 420,
+  "h": 560,
+  "wiki": "Johan Cruyff",
+  "desc": "Dutch footballer and manager (1947–2016)",
+  "image": "Johan_Cruijff_(1974).jpg",
+  "author": "Rob Mieremet / Anefo",
+  "license": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:Johan_Cruijff_(1974).jpg"
+ },
+ "di_stefano": {
+  "file": "assets/players/di_stefano.jpg",
+  "w": 420,
+  "h": 570,
+  "wiki": "Alfredo Di Stéfano",
+  "desc": "Argentine footballer (1926–2014)",
+  "image": "Alfredo_Di_Stefano_River_Plate.jpg",
+  "author": "Unknown authorUnknown author",
+  "license": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Alfredo_Di_Stefano_River_Plate.jpg"
+ },
+ "best": {
+  "file": "assets/players/best.jpg",
+  "w": 420,
+  "h": 582,
+  "wiki": "George Best",
+  "desc": "Northern Irish footballer (1946–2005)",
+  "image": "George_best_1976.jpg",
+  "author": "Bert Verhoeff for Anefo , NL-HaNA, ANEFO / neg. stroken, 1945-1989",
+  "license": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:George_best_1976.jpg"
+ },
+ "muller": {
+  "file": "assets/players/muller.jpg",
+  "w": 494,
+  "h": 657,
+  "wiki": "Gerd Müller",
+  "desc": "German footballer (1945–2021)",
+  "image": "Gerd_Müller_c1973_(cropped).jpg",
+  "author": "Unknown authorUnknown author",
+  "license": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Gerd_M%C3%BCller_c1973_(cropped).jpg"
+ },
+ "puskas": {
+  "file": "assets/players/puskas.jpg",
+  "w": 317,
+  "h": 409,
+  "wiki": "Ferenc Puskás",
+  "desc": "Hungarian footballer (1927–2006)",
+  "image": "Ferenc_Puskas_en_1965.jpg",
+  "author": "Panini",
+  "license": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Ferenc_Puskas_en_1965.jpg"
+ },
+ "platini": {
+  "file": "assets/players/platini.jpg",
+  "w": 294,
+  "h": 400,
+  "wiki": "Michel Platini",
+  "desc": "French football player administrator and player (born 1955)",
+  "image": "Michel_Platini_2010_(cropped).jpg",
+  "author": "Chancellery of the President of the Republic of Poland",
+  "license": "GFDL 1.2",
+  "source": "https://commons.wikimedia.org/wiki/File:Michel_Platini_2010_(cropped).jpg"
+ },
+ "charlton": {
+  "file": "assets/players/charlton.jpg",
+  "w": 420,
+  "h": 596,
+  "wiki": "Bobby Charlton",
+  "desc": "English footballer (1937–2023)",
+  "image": "LondonHouseAmsterdam1966_Bobby_Charlton.jpg",
+  "author": "ANEFO",
+  "license": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:LondonHouseAmsterdam1966_Bobby_Charlton.jpg"
+ },
+ "garrincha": {
+  "file": "assets/players/garrincha.jpg",
+  "w": 420,
+  "h": 554,
+  "wiki": "Garrincha",
+  "desc": "Brazilian footballer (1933–1983)",
+  "image": "Manoel_Francisco_dos_Santos-Garrincha.jpg",
+  "author": "El Gráfico, n° 2233",
+  "license": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Manoel_Francisco_dos_Santos-Garrincha.jpg"
+ },
+ "eusebio": {
+  "file": "assets/players/eusebio.jpg",
+  "w": 420,
+  "h": 558,
+  "wiki": "Eusébio",
+  "desc": "Portuguese footballer (1942–2014)",
+  "image": "Eusebio_en_1973.jpg",
+  "author": "Panini",
+  "license": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Eusebio_en_1973.jpg"
+ },
  "messi": {
   "file": "assets/players/messi.jpg",
   "w": 420,
@@ -595,17 +793,6 @@
   "author": "Unknown authorUnknown author",
   "license": "Public domain",
   "source": "https://commons.wikimedia.org/wiki/File:Argentina_celebrando_copa_(cropped).jpg"
- },
- "beckenbauer": {
-  "file": "assets/players/beckenbauer.jpg",
-  "w": 420,
-  "h": 574,
-  "wiki": "Franz Beckenbauer",
-  "desc": "German footballer (1945–2024)",
-  "image": "Franz_Beckenbauer_(1975).jpg",
-  "author": "Panini Group",
-  "license": "Public domain",
-  "source": "https://commons.wikimedia.org/wiki/File:Franz_Beckenbauer_(1975).jpg"
  }
 };
 })(typeof window !== 'undefined' ? window : globalThis);

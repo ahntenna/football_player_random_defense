@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#070d18">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
 <title>축구 선수 랜덤 디펜스</title>
-<meta name="description" content="The Guardian 2025 세계 축구 선수 TOP 50을 영입해 원정 군단을 막아내는 랜덤 디펜스 게임">
+<meta name="description" content="The Guardian 2026 세계 축구 선수 TOP 50을 영입해 원정 군단을 막아내는 랜덤 디펜스 게임">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -22,9 +22,9 @@
     <div class="title-shade"></div>
     <div class="title-wrap">
       <div class="title-left">
-        <div class="kicker">THE GUARDIAN TOP 50 · 2025 EDITION</div>
+        <div class="kicker">THE GUARDIAN TOP 50 · 2026 EDITION</div>
         <h1 class="logo"><span>축구 선수</span><span class="accent">랜덤 디펜스</span></h1>
-        <p class="tagline">세계 최고의 선수 50인을 영입해 원정 군단을 막아라.<br>운이 좋다면 <b>메시 · 호날두 · 펠레 · 마라도나 · 베켄바우어</b>가 찾아온다.</p>
+        <p class="tagline">세계 최고의 선수 50인을 영입해 원정 군단을 막아라.<br>베켄바우어 · 크루이프 · 지단 등 역대 레전드를 조합하고,<br>비밀 조합을 찾아내면 <b class="rb-text">메시 · 호날두 · 펠레 · 마라도나</b>가 합류한다.</p>
         <div class="menu">
           <div class="menu-row">
             <label for="difficulty">난이도</label>
@@ -71,10 +71,11 @@
         <span class="lbl">경기장 적 <b id="hudEnemies">0</b> / 150 <em>· 150명 초과 시 패배</em></span>
         <div class="bar"><i id="hudEnemyBar"></i></div>
       </div>
-      <div class="hud-cell"><span class="lbl">남은 적</span><span class="big" id="hudRemain">0</span></div>
+      <div class="hud-cell remain"><span class="lbl">남은 적</span><span class="big" id="hudRemain">0</span></div>
       <div class="hud-cell"><span class="lbl" id="hudTimeLbl">경기 시간</span><span class="big" id="hudTime">00:00</span></div>
       <div class="hud-cell boss hidden" id="hudBoss"><span class="lbl">보스 제한</span><span class="big" id="hudBossTime">120</span></div>
       <div class="speed">
+        <button type="button" id="btnSpeedCycle" class="m-only on" title="배속 전환">1×</button>
         <button type="button" data-speed="1" class="on" title="1배속 (1)">1×</button>
         <button type="button" data-speed="2" title="2배속 (2)">2×</button>
         <button type="button" data-speed="3" title="3배속 (3)">3×</button>
@@ -85,6 +86,7 @@
 
     <main class="board">
       <aside class="panel left">
+        <button type="button" class="drawer-close m-only" data-close-drawer>경기 정보 <span>✕ 닫기</span></button>
         <div class="card" id="waveCard"></div>
         <div class="card event-card hidden" id="eventCard"></div>
         <div class="card" id="squadCard"></div>
@@ -96,16 +98,19 @@
         <div class="field" id="field">
           <canvas id="bgCanvas"></canvas>
           <canvas id="fxCanvas"></canvas>
-          <div class="kickoff hidden" id="kickoff"><button type="button" id="btnKickoff">⚽ 킥오프! <b id="kickoffTime">20</b>초</button><small>선수를 영입해 트랙 가까이 배치하세요</small></div>
+          <div class="kickoff hidden" id="kickoff"><button type="button" id="btnKickoff">⚽ 킥오프! <b id="kickoffTime">20</b>초</button><small>영입한 선수를 드래그해 트랙 가까이 배치하세요</small></div>
           <div class="toasts" id="toasts"></div>
           <div class="banner" id="banner"></div>
           <div class="reveal hidden" id="reveal"></div>
           <div class="paused hidden" id="pausedMask"><b>일시정지</b><small>Space 또는 ❚❚ 로 계속</small></div>
+          <!-- 모바일: 선수 정보 오버레이 카드 (스크롤 없이 표시) -->
+          <div class="usheet hidden" id="unitSheet"></div>
         </div>
         <div class="field-hint">선수 클릭: 정보 · 드래그: 이동/교체 · 단축키 Q 영입 · W 10회 · E 합성 · Space 일시정지</div>
       </div>
 
       <aside class="panel right">
+        <button type="button" class="drawer-close m-only" data-close-drawer>임무 · 조합 <span>✕ 닫기</span></button>
         <div class="card" id="missionCard"></div>
         <div class="card incident-card hidden" id="incidentCard"></div>
         <div class="card">
@@ -115,6 +120,12 @@
         <div class="card profile" id="profileCard"></div>
       </aside>
     </main>
+
+    <!-- 모바일: 접이식 정보 띠 (탭하면 서랍이 열린다) -->
+    <nav class="mstrip m-only" id="mstrip">
+      <button type="button" data-drawer="right" id="mTabRight"><b>📋 임무</b><span id="mTabRightTxt">킥오프 전</span></button>
+      <button type="button" data-drawer="left" id="mTabLeft"><b>📊 정보</b><span id="mTabLeftTxt">WAVE 1</span></button>
+    </nav>
 
     <footer class="actions">
       <div class="wallet">

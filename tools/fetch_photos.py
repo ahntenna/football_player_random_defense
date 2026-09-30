@@ -77,12 +77,31 @@ TARGETS = [
     ("alisson", "Alisson Becker"),
     ("kimmich", "Joshua Kimmich"),
     ("calhanoglu", "Hakan Çalhanoğlu"),
+    # 초월 (레전드)
+    ("zidane", "Zinedine Zidane"),
+    ("van_basten", "Marco van Basten"),
+    ("ronaldo_nazario", "Ronaldo (Brazilian footballer)"),
+    ("iniesta", "Andrés Iniesta"),
+    ("matthaus", "Lothar Matthäus"),
+    ("xavi", "Xavi (footballer, born 1980)"),
+    ("henry", "Thierry Henry"),
+    # 태초 (레전드)
+    ("beckenbauer", "Franz Beckenbauer"),
+    ("yashin", "Lev Yashin"),
+    ("cruyff", "Johan Cruyff"),
+    ("di_stefano", "Alfredo Di Stéfano"),
+    ("best", "George Best"),
+    ("muller", "Gerd Müller"),
+    ("puskas", "Ferenc Puskás"),
+    ("platini", "Michel Platini"),
+    ("charlton", "Bobby Charlton"),
+    ("garrincha", "Garrincha"),
+    ("eusebio", "Eusébio"),
     # 히든
     ("messi", "Lionel Messi"),
     ("ronaldo", "Cristiano Ronaldo"),
     ("pele", "Pelé"),
     ("maradona", "Diego Maradona"),
-    ("beckenbauer", "Franz Beckenbauer"),
 ]
 
 

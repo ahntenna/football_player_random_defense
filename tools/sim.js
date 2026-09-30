@@ -57,7 +57,7 @@ function run(difficulty) {
     wave: s.wave, result: s.phase === 'clear' ? 'CLEAR' : s.lossReason, kills: s.stats.kills, units: s.units.length,
     tiers: tiers.join('/'), ups: s.upgrades.join('/'), gold: Math.round(s.gold), missions: s.stats.missions,
     procs: s.stats.procs, maxAlive, simSec: Math.round(s.time), realMs: Date.now() - t0, stepUs: Math.round((Date.now() - t0) * 1000 / tick),
-    hidden: s.stats.hiddenSummons, crafts: s.stats.craft, mvp: g.mvp(3).map((m) => m.id + ':' + C.fmt(m.dealt)).join(' ')
+    hidden: s.units.filter((u) => F.BY_ID[u.id].hidden).length, crafts: s.stats.craft, mvp: g.mvp(3).map((m) => m.id + ':' + C.fmt(m.dealt)).join(' ')
   };
 }
 

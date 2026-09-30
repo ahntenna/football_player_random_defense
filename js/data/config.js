@@ -17,13 +17,15 @@
     { key: 'myth', name: '신화', color: '#ff6f8a' },
     { key: 'trans', name: '초월', color: '#5ff0dc' },
     { key: 'prime', name: '태초', color: '#fff3b8' },
-    { key: 'hidden', name: '히든', color: '#ffd23f' }
+    // 히든: 전설(금색)과 헷갈리지 않도록 무지개(프리즘)로 표현. color 는 단색이 필요한 곳의 대표색(마젠타)
+    { key: 'hidden', name: '히든', color: '#ff5de8', rainbow: true }
   ];
+  C.RAINBOW = ['#ff5f6d', '#ffc36b', '#8dff7a', '#5ed8ff', '#9d7bff', '#ff5de8'];
+  C.RAINBOW_CSS = 'linear-gradient(90deg, #ff5f6d, #ffc36b, #8dff7a, #5ed8ff, #9d7bff, #ff5de8)';
   C.HIDDEN_TIER = 8;
   C.SUMMON_WEIGHTS = [49900, 28000, 14000, 6000, 1570, 430, 100, 0];
   C.SUMMON_COST = 45;
-  C.HIDDEN_SUMMON_CHANCE = 0.0003;   // 히든 영입 확률 0.03%
-  C.HIDDEN_CHANCE_CAP = 0.0006;      // 트로피 보너스 포함 상한 0.06%
+  // 히든 선수는 영입(소환) 대상이 아니다 — 비밀 조합으로만 얻는다.
   C.DESIGNATED_SUMMON_COST = 3000;
   C.SELL_VALUES = [15, 20, 25, 30, 35, 38, 40, 42, 50];
   C.MAX_UP = [30, 30, 30, 30, 30, 20, 20, 20, 20];
@@ -139,8 +141,8 @@
   /* ───────── 웨이브 ───────── */
   /* 원작의 체력 곡선(230 → 35만)은 50인 로스터에서 상위 등급 조합이 더 쉽게 모이기 때문에
      헤드리스 봇 시뮬레이션(tools/sim.js)으로 후반을 가파르게 재보정했다.
-     히든 영입률을 0.03%로 낮추면서 후반 전력이 줄어든 만큼 30~40웨이브 기준점을 다시 낮췄다. */
-  C.HP_ANCHORS = [[1, 260], [5, 900], [10, 4000], [15, 14000], [20, 55000], [25, 200000], [30, 700000], [35, 2400000], [40, 7500000]];
+     히든을 영입에서 제외(비밀 조합으로만 획득)하고, 초월·태초를 역대 레전드(7·11인)로 바꾼 로스터에 맞춰 30~40웨이브 기준점을 다시 낮췄다. */
+  C.HP_ANCHORS = [[1, 260], [5, 900], [10, 4000], [15, 14000], [20, 55000], [25, 200000], [30, 650000], [35, 2000000], [40, 6000000]];
   C.HP_GROWTH_AFTER_40 = 1.22;
   C.waveData = function (n, difficulty) {
     var d = C.DIFFICULTIES[difficulty] || C.DIFFICULTIES.normal;
@@ -267,7 +269,8 @@
     ['ucl_medal', '챔피언스리그 메달', '🥇', 3, '전체 공격력', { damage: 0.065 }],
     ['golden_boot', '골든 부트', '👟', 3, '전체 공격력', { damage: 0.065 }],
     ['offside_trap', '오프사이드 트랩', '🚩', 3, '모든 적 방어력', { enemyArmorBreak: 0.20 / 1.3 }],
-    ['legend_invite', '레전드 매치 초대장', '🃏', 3, '히든 영입 확률', { hiddenBonus: 0.0001 }],
+    // 히든이 영입 대상에서 빠지면서 '히든 영입 확률' → '초월 영입 가중치'로 변경 (보유 레벨은 그대로 유지)
+    ['legend_invite', '레전드 매치 초대장', '🃏', 3, '초월 영입 가중치', { transLuck: 0.25 }],
     ['magic_boots', '마법의 축구화', '🪄', 3, '확률 스킬 발동률', { procChance: 0.02 }],
     ['owner_cheque', '구단주의 수표', '💵', 4, '시작 골드', { startGold: 220 }],
     ['endless_lungs', '무한 체력 심장', '❤️‍🔥', 4, '공격·속도·사거리', { damage: 0.15, rate: 0.12, range: 0.05 }],
@@ -293,7 +296,7 @@
     return {
       startGold: 0, summonDiscount: 0, sellBonus: 0, waveGold: 0, refundChance: 0, rate: 0, range: 0, crit: 0,
       damage: 0, bossDamage: 0, enemySlow: 0, enemyHpDown: 0, enemyArmorBreak: 0, highTierLuck: 0, mythLuck: 0,
-      hiddenBonus: 0, procChance: 0, interest: 0, procDamage: 0, critDamage: 0, emergencyDamage: 0,
+      transLuck: 0, procChance: 0, interest: 0, procDamage: 0, critDamage: 0, emergencyDamage: 0,
       emergencyRate: 0, bossRange: 0, diversityDamagePerUnit: 0, waveStartDamage: 0, waveStartRate: 0
     };
   };
@@ -326,7 +329,7 @@
     var k = Object.keys(e)[0], v = e[k];
     if (k === 'startGold') return relic.label + ' +' + Math.round(v);
     if (k === 'summonDiscount') return relic.label + ' −' + Number(v.toFixed(1)) + ' 골드';
-    if (k === 'hiddenBonus' || k === 'procChance' || k === 'crit') return relic.label + ' +' + pct(v) + '%p';
+    if (k === 'procChance' || k === 'crit') return relic.label + ' +' + pct(v) + '%p';
     return relic.label + ' ' + (['enemySlow', 'enemyHpDown', 'enemyArmorBreak'].indexOf(k) >= 0 ? '−' : '+') + pct(v) + '%';
   };
 
