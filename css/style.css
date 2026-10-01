@@ -70,6 +70,7 @@ small { color: var(--muted); }
 .seg button:disabled { opacity: .5; cursor: not-allowed; }
 .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .menu-grid .btn { padding: 9px 6px; font-size: 13px; }
+.kicker .ver { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; font-size: .85em; letter-spacing: .04em; opacity: .85; vertical-align: 1px; }
 .title-meta { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .title-meta b { color: var(--text); }
 .title-right { position: relative; display: flex; align-items: center; justify-content: center; }
@@ -187,6 +188,11 @@ canvas[data-pid] { border-radius: 14%; } /* 선수 초상: 경기장 배치칸�
 #actSummon, #actSummon10 { position: relative; overflow: hidden; touch-action: none; }
 #actSummon.holding::after, #actSummon10.holding::after { content: ''; position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: rgba(30, 20, 3, .55); transform-origin: left; animation: holdGauge 2s linear infinite; }
 @keyframes holdGauge { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* 단축키 표시 (PC 전용 — 모바일에서는 숨김) */
+.act { position: relative; }
+.act kbd { position: absolute; top: 4px; right: 6px; font: 700 10px/1 var(--mono, ui-monospace, Consolas, monospace); padding: 2px 4px; border-radius: 4px; background: rgba(0,0,0,.28); color: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.14); pointer-events: none; }
+.act.primary kbd { background: rgba(30,20,3,.16); color: rgba(30,20,3,.72); border-color: rgba(30,20,3,.22); }
+.act:disabled kbd { opacity: .5; }
 .act.goldish { background: linear-gradient(180deg, rgba(245,189,79,.28), rgba(245,189,79,.08)); border-color: rgba(245,189,79,.55); }
 .act .badge { background: var(--green); color: #032; border-radius: 999px; padding: 0 6px; font-weight: 900; }
 
@@ -306,6 +312,7 @@ canvas[data-pid] { border-radius: 14%; } /* 선수 초상: 경기장 배치칸�
   .field-wrap { height: 100%; }
   .field { height: 100%; min-height: 0; flex: 1; }
   .field-hint { display: none; }
+  .act kbd { display: none; }
   .panel { display: none; }
 
   /* 정보 서랍 */

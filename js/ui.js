@@ -99,6 +99,7 @@
     inf.disabled = !meta.infinite; inf.textContent = meta.infinite ? '무한 모드' : '무한 모드 🔒';
     if (!meta.infinite && this.mode === 'infinite') { this.mode = 'normal'; $('modeSeg').children[0].classList.add('on'); inf.classList.remove('on'); }
     var r = meta.records, got = meta.unlocked.length;
+    setText($('gameVersion'), 'v' + F.VERSION);
     $('titleMeta').innerHTML = '<span>최고 웨이브 <b>' + r.wave + '</b></span><span>최고 점수 <b>' + fmt(r.score) + '</b></span><span>도감 <b>' + got + ' / ' + F.PLAYERS.length + '</b></span><span>트로피 토큰 <b>' + fmt(meta.relicCurrency) + '</b></span>' + (meta.infinite ? '' : '<span>정규 40웨이브 클리어 시 무한 모드 해금</span>');
     this.renderCollage();
   };
@@ -228,15 +229,23 @@
         return;
       }
       if (self.app.screen !== 'game' || self.modalName) return;
-      var k = e.key.toLowerCase(), g = self.game();
+      if (e.ctrlKey || e.altKey || e.metaKey) return; // 브라우저 단축키(Ctrl+R 등)는 건드리지 않는다
+      // 글자 키는 물리 키(e.code) 기준 — 한글 입력 상태(ㅂ, ㅈ …)에서도 같은 단축키가 동작한다
+      var k = /^Key[A-Z]$/.test(e.code || '') ? e.code.charAt(3).toLowerCase() : e.key.toLowerCase(), g = self.game();
       if (k === ' ') { e.preventDefault(); self.togglePause(); }
       else if (k === 'q') self.doSummon(1);
+      else if (k === 'w' && e.shiftKey) { // 지정 영입
+        if (!g.active()) return;
+        if (g.s.gold < C.DESIGNATED_SUMMON_COST) { self.toast('지정 영입에는 ' + fmt(C.DESIGNATED_SUMMON_COST) + ' 골드가 필요합니다', 'err'); self.app.audio.error(); }
+        else self.open('designated');
+      }
       else if (k === 'w') self.doSummon(10);
       else if (k === 'e') self.doMergeAll();
       else if (k === 'r') self.open('craft');
-      else if (k === 'u') self.open('upgrade');
+      else if (k === 'f' || k === 'u') self.open('upgrade');
+      else if (k === 's') self.open('sell'); // 등급 판매 (선택 선수 판매는 Delete)
       else if (k === '1' || k === '2' || k === '3') self.setSpeed(+k);
-      else if ((k === 's' || k === 'delete') && self.selected !== null) self.handleAct('unit-sell', {});
+      else if (k === 'delete' && self.selected !== null) self.handleAct('unit-sell', {});
       else if (k === 'l' && self.selected !== null) self.handleAct('unit-lock', {});
       else if (k === 'm' && self.selected !== null) self.handleAct('unit-merge', {});
     });
@@ -914,7 +923,7 @@
       '<h4>선수 능력</h4><ul><li><b>기본 공격</b>: 포지션에 따른 공격 방식(피니셔·드리블러·플레이메이커·윙백·골키퍼 등)</li><li><b>플레이 스타일</b>: 결정력·드리블·스피드·패스·강슛·제공권·태클·압박·체력·리더십·빅게임·선방·세트피스</li><li><b>확률 스킬</b>: 공격할 때마다 확률로 발동하는 선수 고유 기술</li><li><b>패시브</b>: 전설 이상 선수의 고유 능력 (예: 뎀벨레의 양발 공격, 메시의 팀 전체 버프)</li></ul>' +
       '<h4>경제</h4><p>적 처치·웨이브 보상·긴급 임무로 골드를 얻습니다. <b>등급 강화</b>는 해당 등급 선수 전체의 공격력(단계당 ×1.23)·공속·사거리·치명을 올립니다. 필요 없는 등급은 일괄 판매하거나 자동 판매를 켜세요.</p>' +
       '<h4>트로피 캐비닛</h4><p>웨이브를 클리어할 때마다 트로피 토큰을 얻고, 캐비닛에서 트로피를 뽑아 영구 능력치를 올릴 수 있습니다.</p>' +
-      '<h4>단축키</h4><p>Q 영입 · W 10회 영입 · E 합성 · R 조합 · U 강화 · 1/2/3 배속 · Space 일시정지 · S 판매 · L 잠금 · M 합성(선택 선수) · Esc 메뉴</p></div>';
+      '<h4>단축키</h4><p>Q 영입 · W 10회 영입 · Shift+W 지정 영입 · S 등급 판매 · E 합성 · F 등급 강화 · R 조합 · 1/2/3 배속 · Space 일시정지 · Esc 메뉴<br>선택한 선수: Delete 판매 · L 잠금 · M 합성</p></div>';
     this.showModal('help', '❓ 게임 방법', h);
   };
 

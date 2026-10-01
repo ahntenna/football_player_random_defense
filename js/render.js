@@ -262,10 +262,6 @@
         rr(g, X(sl.x - 1.08), Y(sl.z - 0.98), 2.16 * s, 1.96 * s, 0.22 * s);
         g.fillStyle = hl ? 'rgba(5,11,22,.6)' : 'rgba(255,255,255,.045)'; g.fill();
         g.lineWidth = Math.max(1, s * 0.03); g.strokeStyle = hl ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.13)'; g.stroke();
-        if (hl) { // 빈칸 표시: 선수 카드와 같은 둥근 사각형 윤곽
-          rr(g, X(sl.x - 0.78), Y(sl.z - 0.78), 1.56 * s, 1.56 * s, 1.56 * s * F.PORTRAIT_RADIUS);
-          g.lineWidth = Math.max(1, s * 0.025); g.strokeStyle = 'rgba(255,255,255,.07)'; g.stroke();
-        }
       });
     }
     // 비네트
@@ -300,63 +296,72 @@
     g.closePath(); g.fill();
   }
 
-  /* 선수 카드 치수 (화면 px): 배치칸(둥근 사각형) 안에 사각형 초상 + 아래 이름표가 들어간다.
-     이름표는 초상 아래 가장자리를 살짝 덮어 목 부분만 가리고 얼굴은 가리지 않는다. */
+  /* 선수 카드 치수 (화면 px): 카드는 배치칸(둥근 사각형) 테두리에 꼭 맞는 크기로 모든 선수가 같다.
+     카드 안쪽은 위 사진 영역 · 아래 이름표 영역으로 나뉘고 그 비율은 고정이다 (이름 길이와 무관). */
+  var CARD_LABEL_RATIO = 0.28; // 카드 안쪽 높이 중 이름표가 차지하는 비율
   R.unitBox = function () {
-    var s = this.scale, P = Math.round((this.highlight ? 1.64 : 1.56) * s), L = Math.max(13, Math.round(0.5 * s)), ov = Math.round(0.18 * s);
-    var H = P + L - ov, tileW = (this.rot ? 1.96 : 2.16) * s;
-    return { P: P, L: L, ov: ov, H: H, maxW: Math.floor(tileW - 0.08 * s), dy: -(L - ov) / 2, rad: P * F.PORTRAIT_RADIUS };
+    var s = this.scale, inset = Math.max(1, Math.round(0.03 * s));
+    var W = Math.round((this.rot ? 1.96 : 2.16) * s) - inset * 2, H = Math.round((this.rot ? 2.16 : 1.96) * s) - inset * 2;
+    var ring = Math.max(1.5, Math.round(0.07 * s)), iw = W - ring * 2, ih = H - ring * 2;
+    var L = Math.round(ih * CARD_LABEL_RATIO);
+    return { W: W, H: H, ring: ring, iw: iw, ih: ih, L: L, PH: ih - L, rad: 0.22 * s - inset };
   };
 
   // 이름표 글자: 칸에 전체 이름이 들어가면 전체 이름, 넘치면 대표 이름(성 또는 이름), 그래도 넘치면 글자 크기를 줄인다
+  // (이름표 영역의 크기는 바뀌지 않는다)
   function fitName(g, def, maxW, L) {
-    var fs = Math.max(9, Math.round(L * 0.64)), padX = L * 0.3, name = def.name;
+    var fs = Math.max(9, Math.round(L * 0.68)), name = def.name;
     var font = function (n) { return '800 ' + n + 'px "Noto Sans KR","Malgun Gothic",sans-serif'; };
     g.font = font(fs);
-    if (g.measureText(name).width + padX * 2 > maxW) name = def.short;
-    while (g.measureText(name).width + padX * 2 > maxW && fs > 8) { fs--; g.font = font(fs); }
-    return { text: name, width: g.measureText(name).width, pad: padX };
+    if (g.measureText(name).width > maxW) name = def.short;
+    while (g.measureText(name).width > maxW && fs > 7) { fs--; g.font = font(fs); }
+    return { text: name, width: g.measureText(name).width };
   }
 
   R.unitSprite = function (id) {
     var sp = this.unitSprites[id]; if (sp) return sp;
-    var def = BY_ID[id], b = this.unitBox(), P = b.P, hl = this.highlight, tier = C.TIERS[def.tier], hidden = !!def.hidden;
-    var pad = Math.ceil(P * 0.16), Wc = Math.max(P, b.maxW) + pad * 2, Hc = b.H + pad * 2;
+    var def = BY_ID[id], b = this.unitBox(), W = b.W, H = b.H, hl = this.highlight, tier = C.TIERS[def.tier], hidden = !!def.hidden;
+    var pad = Math.ceil(0.26 * this.scale), Wc = W + pad * 2, Hc = H + pad * 2;
     var c = document.createElement('canvas'); c.width = Wc; c.height = Hc;
-    var g = c.getContext('2d'), cx = Wc / 2, px = cx - P / 2, py = pad, rad = b.rad;
+    var g = c.getContext('2d'), cx = Wc / 2, px = pad, py = pad, rad = b.rad, ring = b.ring;
+    var ix = px + ring, iy = py + ring, irad = Math.max(1, rad - ring);
     // 그림자
-    g.fillStyle = 'rgba(0,0,0,.4)'; rr(g, px + 1, py + P * 0.06, P, P, rad); g.fill();
-    // 선수 강조: 등급 색 글로 + 얇은 어두운 외곽선 (스프라이트에 한 번만 그리므로 프레임 비용 없음)
+    g.fillStyle = 'rgba(0,0,0,.4)'; rr(g, px + 1, py + H * 0.05, W, H, rad); g.fill();
+    // 선수 강조: 등급 색 글로 (스프라이트에 한 번만 그리므로 프레임 비용 없음)
     if (hl) {
-      var o = Math.max(1, P * 0.022);
       g.save();
-      g.shadowColor = hexA(tier.color, def.tier >= 1 ? 0.75 : 0.5); g.shadowBlur = P * 0.14;
-      g.fillStyle = '#050a14'; rr(g, px - o, py - o, P + o * 2, P + o * 2, rad + o); g.fill();
+      g.shadowColor = hexA(tier.color, def.tier >= 1 ? 0.75 : 0.5); g.shadowBlur = pad * 0.85;
+      g.fillStyle = '#050a14'; rr(g, px, py, W, H, rad); g.fill();
       g.restore();
     }
-    // 등급 테두리 — 배치칸과 같은 둥근 사각형, 얇게 (한 변의 약 5%)
-    var ring = Math.max(1.5, P * 0.05), inner = P - ring * 2;
-    if (hidden) g.fillStyle = rainbow(g, cx, py + P / 2, P / 2, -Math.PI / 2);
+    // 등급 테두리 — 배치칸과 같은 둥근 사각형
+    if (hidden) g.fillStyle = rainbow(g, cx, py + H / 2, Math.max(W, H) / 2, -Math.PI / 2);
     else if (def.tier >= 5) {
-      var gr = g.createLinearGradient(px, py, px + P, py + P);
+      var gr = g.createLinearGradient(px, py, px + W, py + H);
       gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.5, tier.color); gr.addColorStop(1, F.shade(tier.color, -0.3));
       g.fillStyle = gr;
     } else g.fillStyle = tier.color;
-    rr(g, px, py, P, P, rad); g.fill();
-    g.drawImage(F.portrait(id, inner), px + ring, py + ring);
-    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; rr(g, px + ring, py + ring, inner, inner, inner * F.PORTRAIT_RADIUS); g.stroke();
-    // 이름표
-    var nm = fitName(g, def, b.maxW, b.L), lw = Math.min(b.maxW, Math.max(P * 0.7, nm.width + nm.pad * 2)), ly = py + P - b.ov;
-    rr(g, cx - lw / 2, ly, lw, b.L, b.L * 0.32);
-    g.fillStyle = 'rgba(6,11,20,.94)'; g.fill();
-    g.lineWidth = Math.max(1, P * 0.022); g.strokeStyle = hidden ? rainbow(g, cx, ly + b.L / 2, lw / 2, 0) : tier.color; g.stroke();
+    rr(g, px, py, W, H, rad); g.fill();
+    // 안쪽: 사진 영역(위) + 이름표 영역(아래) — 고정 비율
+    g.save();
+    rr(g, ix, iy, b.iw, b.ih, irad); g.clip();
+    F.drawPhoto(g, id, ix, iy, b.iw, b.PH);
+    var ly = iy + b.PH;
+    g.fillStyle = 'rgba(6,11,20,.96)'; g.fillRect(ix, ly, b.iw, b.L);
+    var sepC = tier.color;
+    if (hidden) { sepC = g.createLinearGradient(ix, 0, ix + b.iw, 0); RAINBOW.forEach(function (col, i) { sepC.addColorStop(i / (RAINBOW.length - 1), col); }); }
+    g.fillStyle = sepC; g.fillRect(ix, ly, b.iw, Math.max(1, ring * 0.5));
+    g.restore();
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; rr(g, ix, iy, b.iw, b.ih, irad); g.stroke();
+    // 이름
+    var nm = fitName(g, def, b.iw - b.L * 0.3, b.L);
     if (hidden) {
       var tg = g.createLinearGradient(cx - nm.width / 2, 0, cx + nm.width / 2, 0);
       RAINBOW.forEach(function (col, i) { tg.addColorStop(i / (RAINBOW.length - 1), col); });
       g.fillStyle = tg;
     } else g.fillStyle = '#f4f7fb';
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(nm.text, cx, ly + b.L / 2 + 0.5);
+    g.fillText(nm.text, cx, ly + b.L / 2 + 1);
     this.unitSprites[id] = c;
     return c;
   };
@@ -538,8 +543,8 @@
       }
     }
 
-    // 선수 — 사각형 초상 카드 (초상 중심은 칸 중심보다 이름표 높이만큼 위)
-    var units = st.units, box = this.unitBox(), P = box.P, half = P / 2, brad = box.rad;
+    // 선수 — 배치칸에 꼭 맞는 카드 (사진 + 이름표, 모든 선수 동일 크기)
+    var units = st.units, box = this.unitBox(), CW = box.W, CH = box.H, hw2 = CW / 2, hh2 = CH / 2, brad = box.rad, P = Math.min(CW, CH);
     for (i = 0; i < units.length; i++) {
       var u = units[i], sl = GEO.SLOTS[u.slot];
       if (this.drag && this.drag.uid === u.uid && this.drag.moved) continue;
@@ -547,31 +552,32 @@
       var an = this.anim[u.uid]; if (an > 0) { this.anim[u.uid] = an - dt; k = 1 + an * 0.45; }
       var nb = this.newbie[u.uid]; if (nb > 0) { this.newbie[u.uid] = nb - dt; k *= 1 + nb * 0.9; }
       var w = sp.width * k, h = sp.height * k;
-      var def = BY_ID[u.id], pcx = ux, pcy = uy + box.dy * k;
-      if (def.hidden) {
-        // 히든: 회전하는 무지개(프리즘) 테두리 — 전설(금색)과 한눈에 구분된다.
-        // 카드보다 먼저(뒤에) 그려서 이름표가 테두리 위에 오도록 한다 (이름 글자가 가려지지 않게)
-        var lw = Math.max(2, P * 0.05), o = lw * 0.5 + 2;
-        g.strokeStyle = rainbow(g, pcx, pcy, half, this.time * 2.4); g.lineWidth = lw;
-        rr(g, pcx - half - o, pcy - half - o, P + o * 2, P + o * 2, brad + o); g.stroke();
-      }
+      var def = BY_ID[u.id], pcx = ux, pcy = uy;
       g.drawImage(sp, ux - w / 2, uy - h / 2, w, h);
+      if (def.hidden) {
+        // 히든: 카드 테두리 위를 도는 무지개(프리즘) — 전설(금색)과 한눈에 구분된다.
+        // 테두리 폭 안에서만 그리므로 사진 · 이름표를 가리지 않는다
+        var lw = box.ring * k;
+        g.strokeStyle = rainbow(g, pcx, pcy, Math.max(hw2, hh2), this.time * 2.4); g.lineWidth = lw;
+        rr(g, pcx - hw2 * k + lw / 2, pcy - hh2 * k + lw / 2, CW * k - lw, CH * k - lw, Math.max(1, brad * k - lw / 2)); g.stroke();
+      }
+      var bx = hw2 - P * 0.13, by = hh2 - P * 0.13; // 카드 모서리 배지 위치
       if (u.disabled > 0) {
-        g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, pcx - half, pcy - half, P, P, brad); g.fill();
-        g.fillStyle = '#e02424'; g.fillRect(pcx - P * 0.12, pcy - P * 0.2, P * 0.24, P * 0.34);
+        g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, pcx - hw2, pcy - hh2, CW, CH, brad); g.fill();
+        g.fillStyle = '#e02424'; g.fillRect(pcx - P * 0.12, pcy - P * 0.24, P * 0.24, P * 0.34);
       }
       if (this.mergeable[u.id] && !u.locked) {
-        g.fillStyle = '#39d98a'; g.beginPath(); g.arc(pcx + P * 0.44, pcy - P * 0.44, P * 0.15, 0, TAU); g.fill();
-        g.fillStyle = '#062'; g.font = '900 ' + Math.round(P * 0.2) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText('▲', pcx + P * 0.44, pcy - P * 0.44 + 1);
+        g.fillStyle = '#39d98a'; g.beginPath(); g.arc(pcx + bx, pcy - by, P * 0.13, 0, TAU); g.fill();
+        g.fillStyle = '#062'; g.font = '900 ' + Math.round(P * 0.17) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('▲', pcx + bx, pcy - by + 1);
       }
       if (u.locked) {
-        g.fillStyle = 'rgba(10,16,28,.9)'; g.beginPath(); g.arc(pcx - P * 0.44, pcy - P * 0.44, P * 0.15, 0, TAU); g.fill();
-        g.font = Math.round(P * 0.17) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🔒', pcx - P * 0.44, pcy - P * 0.43);
+        g.fillStyle = 'rgba(10,16,28,.9)'; g.beginPath(); g.arc(pcx - bx, pcy - by, P * 0.13, 0, TAU); g.fill();
+        g.font = Math.round(P * 0.15) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🔒', pcx - bx, pcy - by + 0.5);
       }
       if (sel && sel.uid === u.uid) {
         g.strokeStyle = '#fff'; g.lineWidth = 2; g.setLineDash([4, 3]);
-        rr(g, pcx - half - 5, pcy - half - 5, P + 10, box.H + 9, brad + 5); g.stroke(); g.setLineDash([]);
+        rr(g, pcx - hw2 - 4, pcy - hh2 - 4, CW + 8, CH + 8, brad + 4); g.stroke(); g.setLineDash([]);
       }
     }
     if (this.drag && this.drag.moved) {

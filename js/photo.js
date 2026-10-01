@@ -60,6 +60,28 @@
   };
   F.clearPortraitCache = function () { portraitCache = {}; };
 
+  /* 직사각형 영역(w × h)에 사진을 꽉 채워 그린다 — 경기장 선수 카드용.
+     얼굴 크롭(정사각형)의 세로 구도를 유지한 채 영역 비율에 맞게 좌우(또는 상하)를 넓혀 잘라낸다.
+     사진 경계를 넘으면 비율을 지키면서 줄인다. 클리핑은 호출하는 쪽에서 한다. */
+  F.drawPhoto = function (g, id, x, y, w, h) {
+    var img = F.photoImage(id);
+    if (!img) {
+      var size = Math.max(w, h);
+      g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+      g.translate(x + (w - size) / 2, y + (h - size) / 2);
+      drawFallback(g, F.BY_ID[id], size);
+      g.restore();
+      return;
+    }
+    var iw = img.naturalWidth, ih = img.naturalHeight, cr = F.photoCrop(id, iw, ih), a = w / h;
+    var sw = a >= 1 ? cr.s * a : cr.s, sh = a >= 1 ? cr.s : cr.s / a;
+    var k = Math.min(1, iw / sw, ih / sh); sw *= k; sh *= k;
+    var cx = cr.sx + cr.s / 2, cy = cr.sy + cr.s / 2;
+    var sx = Math.max(0, Math.min(iw - sw, cx - sw / 2)), sy = Math.max(0, Math.min(ih - sh, cy - sh / 2));
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  };
+
   function roundRect(g, x, y, w, h, r) {
     g.beginPath();
     g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r);

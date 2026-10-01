@@ -63,9 +63,9 @@
   // 영입한 선수는 화면 기준 맨 윗줄 · 맨 왼쪽 칸부터 차례로 채운다.
   // 가로 화면: 윗줄(z 작은 쪽)부터 왼쪽(x 작은 쪽)으로 = 칸 번호 순서
   var SLOT_ORDER = SLOTS.map(function (s, i) { return i; });
-  // 세로(90° 회전) 화면: 화면의 윗줄 = 월드 x 가 작은 열, 화면의 왼쪽 = 월드 z 가 큰 행
-  var SLOT_ORDER_ROT = [];
-  for (var oc = 0; oc < 8; oc++) for (var orow = 5; orow >= 0; orow--) SLOT_ORDER_ROT.push(orow * 8 + oc);
+  // 세로(90° 회전) 화면: 가로 화면을 시계 방향으로 돌린 것이므로 같은 칸 번호 순서가
+  // 화면의 맨 오른쪽 위 칸에서 시작해 아래로 내려가고, 한 열이 차면 왼쪽 열로 넘어간다 (PC 와 같은 순서).
+  var SLOT_ORDER_ROT = SLOT_ORDER;
 
   F.GEO = { TRACK: TRACK, PITCH: PITCH, WORLD: WORLD, POLY: POLY, PATH_LENGTH: PATH_LENGTH, SLOTS: SLOTS, SLOT_ORDER: SLOT_ORDER, SLOT_ORDER_ROT: SLOT_ORDER_ROT, setPosition: setPosition };
 
