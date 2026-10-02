@@ -255,7 +255,7 @@
     var app = this.app, g = this.game(), meta = app.meta, au = app.audio, n = 0;
     if (k === 0) {
       if (app.screen !== 'title') return;
-      n = 0x2328;
+      n = 0xdbba0;
       meta.relicCurrency += n; app.saveMeta(); this.renderTitle();
       if (this.modalName === 'relics') this.open('relics');
       au.unlock(); au.coin(); this.toast('🏆 트로피 토큰 +' + fmt(n), 'ok');
@@ -506,7 +506,7 @@
       sq += '<div style="border-color:' + C.TIERS[t].color + '44">' + tierText(t) + '<b>' + counts[t] + '</b></div>';
     }
     sq += '</div>';
-    var ups = s.upgrades.map(function (lv, t) { return lv ? '<span class="chip">' + tierText(t) + ' +' + lv + '</span>' : ''; }).join('');
+    var ups = s.upgrades.map(function (lv, t) { return lv ? '<span class="chip">' + tierText(t) + (t === 7 ? ' · ' + tierText(8) : '') + ' +' + lv + '</span>' : ''; }).join('');
     if (ups) sq += '<div class="chips" style="margin-top:8px">' + ups + '</div>';
     var tm = g.team;
     var teamFx = [];
@@ -908,12 +908,21 @@
     var h = '<div class="row" style="flex-wrap:wrap"><div class="grow"><div class="t">🏆 트로피 토큰 ' + fmt(meta.relicCurrency) + '</div><div class="s">웨이브를 클리어할 때마다 획득 · 보유한 트로피 효과는 다음 경기부터 자동 적용 · 수집 ' + owned + ' / ' + C.RELICS.length + '</div></div>' +
       '<button type="button" class="btn" data-m="relic-draw" data-n="1"' + (meta.relicCurrency < C.RELIC_SUMMON_COST ? ' disabled' : '') + '>1회 뽑기 · ' + C.RELIC_SUMMON_COST + '</button>' +
       '<button type="button" class="btn primary" data-m="relic-draw" data-n="10"' + (meta.relicCurrency < C.RELIC_TEN_COST ? ' disabled' : '') + '>10회 뽑기 · ' + C.RELIC_TEN_COST + '</button></div>';
+    // 일괄 뽑기(토큰을 다 쓸 때까지) · 일괄 강화(조각이 충분한 트로피 전부)
+    var allN = Math.floor(meta.relicCurrency / C.RELIC_TEN_COST) * 10 + Math.floor(meta.relicCurrency % C.RELIC_TEN_COST / C.RELIC_SUMMON_COST), upN = 0;
+    C.RELICS.forEach(function (rel) { var o = meta.relics[rel.id]; if (o && o.level < C.RELIC_MAX_LEVEL && o.shards >= C.RELIC_UPGRADE_SHARDS[o.level]) upN++; });
+    h += '<div class="row" style="flex-wrap:wrap;margin-top:8px"><div class="grow"><div class="s">일괄 뽑기는 토큰이 남는 동안 계속 뽑고, 일괄 강화는 조각이 충분한 트로피를 끝까지 강화합니다.</div></div>' +
+      '<button type="button" class="btn" data-m="relic-draw-all"' + (allN ? '' : ' disabled') + '>일괄 뽑기' + (allN ? ' · ' + fmt(allN) + '회' : '') + '</button>' +
+      '<button type="button" class="btn" data-m="relic-up-all"' + (upN ? '' : ' disabled') + '>일괄 강화' + (upN ? ' · ' + upN + '종' : '') + '</button></div>';
     var total = C.RELIC_RARITIES.reduce(function (a, r) { return a + r.weight; }, 0);
-    h += '<div class="odds" style="margin:10px 0">' + C.RELIC_RARITIES.map(function (r) { return '<span class="chip" style="color:' + r.color + '">' + r.name + ' ' + (r.weight / total * 100).toFixed(1) + '% · 중복 +' + r.shards + '조각</span>'; }).join('') + '<span class="chip">신화 이상 천장 ' + meta.relicPity + ' / ' + C.RELIC_PITY + '</span></div>';
+    h += '<div class="odds" style="margin:10px 0">' + C.RELIC_RARITIES.map(function (r) { return '<span class="chip" style="color:' + r.color + '">' + r.name + ' ' + (r.weight / total * 100).toFixed(1) + '% · 중복 +' + r.shards + '조각</span>'; }).join('') + '<span class="chip">신화 이상 확정까지 ' + Math.max(1, C.RELIC_PITY - meta.relicPity) + '회 (천장 ' + C.RELIC_PITY + '회)</span></div>';
     if (st.results && st.results.length) {
-      h += '<div class="box"><div class="h">뽑기 결과</div><div class="chips">' + st.results.map(function (r) {
-        var rel = C.RELIC_BY_ID[r.id], col = C.RELIC_RARITIES[rel.rarity].color;
-        return '<span class="chip" style="border-color:' + col + ';color:' + col + '">' + rel.icon + ' ' + esc(rel.name) + (r.isNew ? ' NEW' : r.shards ? ' +' + r.shards + '조각' : ' +' + r.refund + '토큰') + '</span>';
+      h += '<div class="box"><div class="h">' + esc(st.title || '뽑기 결과') + '</div><div class="chips">' + st.results.map(function (r) {
+        var rel = C.RELIC_BY_ID[r.id], col = C.RELIC_RARITIES[rel.rarity].color, tx;
+        if (r.to) tx = ' Lv.' + r.from + ' → ' + r.to; // 일괄 강화
+        else if (r.count) tx = ' ×' + fmt(r.count) + (r.isNew ? ' NEW' : '') + (r.shards ? ' +' + fmt(r.shards) + '조각' : '') + (r.refund ? ' +' + fmt(r.refund) + '토큰' : ''); // 일괄 뽑기(합산)
+        else tx = r.isNew ? ' NEW' : r.shards ? ' +' + r.shards + '조각' : ' +' + r.refund + '토큰';
+        return '<span class="chip" style="border-color:' + col + ';color:' + col + '">' + rel.icon + ' ' + esc(rel.name) + tx + '</span>';
       }).join('') + '</div></div>';
     }
     h += '<div class="relic-grid" style="margin-top:10px">';
@@ -1027,8 +1036,10 @@
     var g = this.game(), s = g.s; if (!s) return;
     var h = '<p class="hint">단계마다 해당 등급 선수 전체 공격력 ×1.23 · 공속 +3.5% · 사거리 +1.5% · 치명 +0.9%p</p><div class="list">';
     for (var t = 0; t <= 8; t++) {
-      var lv = s.upgrades[t], max = C.MAX_UP[t], cost = g.upgradeCost(t), n = s.units.filter(function (u) { return BY_ID[u.id].tier === t; }).length;
-      h += '<div class="row"><div class="grow"><div class="t">' + tierTag(t) + ' Lv.' + lv + ' <small>/ ' + max + '</small></div><div class="s">배치 ' + n + '명 · 공격력 ×' + Math.pow(1.23, lv).toFixed(2) + '</div></div>' +
+      if (C.UPGRADE_GROUP[t] !== t) continue; // 히든은 태초와 같은 강화를 쓴다
+      var lv = s.upgrades[t], max = C.MAX_UP[t], cost = g.upgradeCost(t), n = s.units.filter(function (u) { return C.UPGRADE_GROUP[BY_ID[u.id].tier] === t; }).length;
+      var tags = tierTag(t); C.UPGRADE_GROUP.forEach(function (to, from) { if (to === t && from !== t) tags += ' ' + tierTag(from); });
+      h += '<div class="row"><div class="grow"><div class="t">' + tags + ' Lv.' + lv + ' <small>/ ' + max + '</small></div><div class="s">배치 ' + n + '명 · 공격력 ×' + Math.pow(1.23, lv).toFixed(2) + '</div></div>' +
         '<button type="button" class="btn small ' + (s.gold >= cost && lv < max ? 'primary' : '') + '" data-m="upgrade" data-t="' + t + '"' + (lv >= max || s.gold < cost ? ' disabled' : '') + '>' + (lv >= max ? '최대' : '강화 · ' + fmt(cost)) + '</button></div>';
     }
     h += '</div>';
@@ -1115,7 +1126,19 @@
       case 'relic-up':
         r = g.upgradeRelic(d.id);
         if (r.error) { this.toast(r.error, 'err'); break; }
-        au.merge(); this.app.saveMeta(); this.open('relics', { results: this.modalState.results, keep: true });
+        au.merge(); this.app.saveMeta(); this.open('relics', { results: this.modalState.results, title: this.modalState.title, keep: true });
+        break;
+      case 'relic-draw-all':
+        r = g.summonRelicsAll();
+        if (r.error) { this.toast(r.error, 'err'); break; }
+        if (r.results.some(function (x) { return x.rarity >= 4; })) au.cheer(1); else au.coin();
+        this.app.saveMeta(); this.open('relics', { results: r.results, title: '일괄 뽑기 결과 · ' + fmt(r.draws) + '회', keep: true });
+        break;
+      case 'relic-up-all':
+        r = g.upgradeRelicsAll();
+        if (r.error) { this.toast(r.error, 'err'); break; }
+        au.merge(); this.app.saveMeta();
+        this.open('relics', { results: r.list.map(function (x) { return { id: x.id, from: x.from, to: x.to }; }), title: '일괄 강화 결과 · ' + r.list.length + '종 · 총 +' + r.count + '레벨', keep: true });
         break;
       case 'rank-filter': this.open('records', { filter: d.f }); break;
       case 'reset-data':

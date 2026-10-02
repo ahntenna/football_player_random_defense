@@ -220,7 +220,7 @@
 
   /* ───────── 전투 수치 ───────── */
   G.power = function (u) {
-    var s = this.s, def = BY_ID[u.id], role = C.ROLES[def.role], tier = def.tier, up = s.upgrades[tier], fx = this.fx, t = this.team;
+    var s = this.s, def = BY_ID[u.id], role = C.ROLES[def.role], tier = def.tier, up = s.upgrades[C.UPGRADE_GROUP[tier]], fx = this.fx, t = this.team;
     var a = this.aura[u.uid] || ZERO_AURA, ev = this.event() || {}, p = def.passive, pk = p && p.key;
     var emergency = this.aliveCount >= 90, waveStart = s.phase === 'wave' && s.waveTime < 15;
     var relicDamage = fx.damage + Math.min(20, t.distinct) * fx.diversityDamagePerUnit + (emergency ? fx.emergencyDamage : 0) + (waveStart ? fx.waveStartDamage : 0);
@@ -923,9 +923,11 @@
   };
 
   /* ───────── 강화 ───────── */
-  G.upgradeCost = function (tier) { return Math.round((75 + tier * 90) * Math.pow(1 + C.UPGRADE_GROWTH, this.s.upgrades[tier])); };
+  // 히든은 태초와 강화를 공유한다 (C.UPGRADE_GROUP) — 어느 쪽으로 요청해도 태초 단계가 오른다
+  G.upgradeCost = function (tier) { tier = C.UPGRADE_GROUP[tier]; return Math.round((75 + tier * 90) * Math.pow(1 + C.UPGRADE_GROWTH, this.s.upgrades[tier])); };
   G.upgrade = function (tier) {
     var s = this.s; if (!this.active()) return { error: '경기 중에만 강화할 수 있어요.' };
+    tier = C.UPGRADE_GROUP[tier];
     if (s.upgrades[tier] >= C.MAX_UP[tier]) return { error: '최대 강화 단계예요.' };
     var cost = this.upgradeCost(tier);
     if (s.gold < cost) return { error: '골드가 부족해요.' };
@@ -1062,6 +1064,38 @@
     this.emit('relicdraw', results);
     return { ok: true, results: results };
   };
+  /* 일괄 뽑기: 토큰이 남는 동안 10회(할인) → 1회 순으로 계속 뽑는다. 결과는 트로피별로 합산해 돌려준다. */
+  G.summonRelicsAll = function () {
+    var meta = this.meta, sum = {}, order = [], draws = 0, guard = 0;
+    if (meta.relicCurrency < C.RELIC_SUMMON_COST) return { error: '트로피 토큰이 부족해요.' };
+    var active = this.active(), self = this, emit = this.emit;
+    this.emit = function () {}; // 묶음마다 이벤트를 내지 않는다
+    while (meta.relicCurrency >= C.RELIC_SUMMON_COST && guard++ < 200000) {
+      var r = this.summonRelics(meta.relicCurrency >= C.RELIC_TEN_COST ? 10 : 1);
+      if (r.error) break;
+      draws += r.results.length;
+      r.results.forEach(function (x) {
+        var a = sum[x.id]; if (!a) { a = sum[x.id] = { id: x.id, rarity: x.rarity, isNew: false, shards: 0, refund: 0, count: 0 }; order.push(a); }
+        a.count++; if (x.isNew) a.isNew = true; a.shards += x.shards || 0; a.refund += x.refund || 0;
+      });
+    }
+    this.emit = emit;
+    order.sort(function (a, b) { return b.rarity - a.rarity || b.count - a.count; });
+    if (!active) self.fx = self.computeRelicEffects();
+    this.emit('relicdraw', order);
+    return { ok: true, draws: draws, results: order };
+  };
+  /* 일괄 강화: 조각이 충분한 트로피를 더 올릴 수 없을 때까지 강화한다 */
+  G.upgradeRelicsAll = function () {
+    var meta = this.meta, total = 0, list = [], self = this;
+    C.RELICS.forEach(function (relic) {
+      var owned = meta.relics[relic.id]; if (!owned) return;
+      var from = owned.level;
+      while (owned.level < C.RELIC_MAX_LEVEL && owned.shards >= C.RELIC_UPGRADE_SHARDS[owned.level]) { if (self.upgradeRelic(relic.id).error) break; }
+      if (owned.level > from) { total += owned.level - from; list.push({ id: relic.id, from: from, to: owned.level }); }
+    });
+    return total ? { ok: true, count: total, list: list } : { error: '강화할 수 있는 트로피가 없어요.' };
+  };
   G.upgradeRelic = function (id) {
     var meta = this.meta, relic = C.RELIC_BY_ID[id], owned = meta.relics[id];
     if (!relic || !owned) return { error: '먼저 트로피를 획득하세요.' };
@@ -1090,6 +1124,8 @@
       s.enemies = (s.enemies || []).filter(function (e) { return e.hp > 0; });
       s.enemies.forEach(function (e) { setPosition(e); });
       if (!Array.isArray(s.upgrades) || s.upgrades.length < 9) s.upgrades = (s.upgrades || []).concat([0, 0, 0, 0, 0, 0, 0, 0, 0]).slice(0, 9);
+      // 예전 저장: 히든 강화가 따로 있었다 → 태초 강화와 합친다 (높은 쪽 유지)
+      C.UPGRADE_GROUP.forEach(function (to, from) { if (to !== from) { s.upgrades[to] = Math.max(s.upgrades[to], s.upgrades[from]); s.upgrades[from] = 0; } });
       s.paused = false;
       this.s = null;
       this.fx = this.computeRelicEffects();

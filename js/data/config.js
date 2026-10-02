@@ -8,7 +8,7 @@
   var C = F.C = {};
 
   /* 게임 버전 — 타이틀 화면에 표시한다. 게임을 수정할 때마다 올린다. */
-  F.VERSION = '1.9.0';
+  F.VERSION = '1.9.2';
 
   /* ───────── 등급 ───────── */
   C.TIERS = [
@@ -33,7 +33,10 @@
   C.SELL_VALUES = [15, 20, 25, 30, 35, 38, 40, 42, 50];
   C.MAX_UP = [30, 30, 30, 30, 30, 20, 20, 20, 20];
   C.UPGRADE_GROWTH = 0.45;
-  C.BASE_DAMAGE = [17, 62, 225, 815, 4400, 17500, 67000, 285000, 330000];
+  // 히든은 태초의 약 2.1배 (v1.9.1 이전 330000 = 약 1.16배)
+  C.BASE_DAMAGE = [17, 62, 225, 815, 4400, 17500, 67000, 285000, 600000];
+  // 등급 강화 묶음: 히든(8)은 태초(7)와 같은 강화 단계를 쓴다
+  C.UPGRADE_GROUP = [0, 1, 2, 3, 4, 5, 6, 7, 7];
   C.TIER_MULT = [1.5, 1.5, 1.5, 1.5, 1.584, 1.445, 1.275, 1.275, 1.275];
   C.MERGE_MAX_TIER = 3;           // 에픽까지 3합성 가능
   C.START_GOLD = 330;
@@ -249,7 +252,7 @@
   C.RELIC_SUMMON_COST = 100;
   C.RELIC_TEN_COST = 900;
   C.RELIC_MAX_LEVEL = 15;
-  C.RELIC_PITY = 39;
+  C.RELIC_PITY = 39; // 신화 이상이 안 나온 채로 38회를 뽑으면 39회째는 신화 이상 확정
   C.RELIC_UPGRADE_SHARDS = [0, 5, 10, 20, 30, 45, 65, 90, 120, 155, 195, 240, 290, 340, 395];
 
   // [id, 이름, 아이콘, 희귀도, 라벨, 최대 효과]
@@ -345,7 +348,7 @@
 
   C.rollRelic = function (random, pity) {
     var weights = C.RELIC_RARITIES.map(function (r) { return r.weight; });
-    if (pity >= C.RELIC_PITY) { weights[4] += 200; weights[0] -= 200; }
+    if (pity >= C.RELIC_PITY - 1) weights = weights.map(function (w, i) { return i >= 4 ? w : 0; }); // 천장: 신화 이상만 남긴다 (신화·초월·태초 비율은 그대로)
     var total = weights.reduce(function (a, b) { return a + b; }, 0), roll = random() * total, rarity = 0;
     for (var i = 0; i < weights.length; i++) { roll -= weights[i]; if (roll < 0) { rarity = i; break; } }
     var pool = C.RELICS.filter(function (r) { return r.rarity === rarity; });

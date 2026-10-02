@@ -15,7 +15,7 @@ const F = globalThis.FPRD, C = F.C;
 
 function bestUpgrade(g) {
   const s = g.s, weight = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  for (const u of s.units) { const t = F.BY_ID[u.id].tier; weight[t] += C.BASE_DAMAGE[t] * C.TIER_MULT[t]; }
+  for (const u of s.units) { const t = F.BY_ID[u.id].tier; weight[C.UPGRADE_GROUP[t]] += C.BASE_DAMAGE[t] * C.TIER_MULT[t]; }
   let best = -1, bestRatio = 0;
   for (let t = 0; t < 9; t++) {
     if (!weight[t] || s.upgrades[t] >= C.MAX_UP[t]) continue;
