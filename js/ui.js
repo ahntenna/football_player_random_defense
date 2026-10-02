@@ -219,10 +219,75 @@
     cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   };
 
+  /* ───────── 입력 시퀀스 ─────────
+     최근에 누른 글자 키를 모아 해시로만 비교한다 (원문은 코드에 두지 않는다).
+     시퀀스를 입력하는 도중에는 같은 글자의 단축키가 실행되지 않도록 키를 삼킨다. */
+  var SEQ = [[14, 0x20ba9926], [14, 0x2fc7e2fe], [17, 0xad7d5797]], SEQ_MAX = 17, SEQ_GAP = 2500, SEQ_PART = {};
+  [0x18d8c4f7, 0x1a151035, 0x2e3e1ab3, 0x3423b83c, 0x3d569dc0, 0x3e15ae98, 0x3ff39a8b, 0x43cba7be, 0x44f39b57, 0x46d9d9bd,
+    0x49c08e8a, 0x524674ab, 0x54a36280, 0x54f52398, 0x55844ccb, 0x594b321, 0x5e63dcc3, 0x5fad51ed, 0x60f80c32, 0x62742b6,
+    0x6874e421, 0x6e9f7c6d, 0x74837500, 0x77c1722f, 0x77e33c26, 0x7fbc7fa8, 0x8252a320, 0x8ce3ade1, 0x93868776, 0x97f3f7f,
+    0x9934fe56, 0xb10a9987, 0xb708fd6e, 0xbb20174c, 0xc1e4956a, 0xc459d06, 0xd46fb091, 0xe3b5b630, 0xee8a1c7d
+  ].forEach(function (v) { SEQ_PART[v] = 1; });
+  function seqHash(t) {
+    var h = (0x811c9dc5 ^ (t.length * 0x9e3779b1)) >>> 0;
+    for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i) + i * 131; h = Math.imul(h, 0x01000193); h ^= h >>> 13; }
+    return h >>> 0;
+  }
+  // 이 키를 시퀀스가 가져갔으면 true (호출한 쪽은 단축키를 실행하지 않는다)
+  U.seqKey = function (e) {
+    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+    var code = e.code || '', now = performance.now(), i;
+    if (/^(Shift|Control|Alt|Meta|CapsLock)/.test(code)) return false;
+    if (now - (this._seqAt || 0) > SEQ_GAP) { this._seq = ''; this._seqLive = false; }
+    if (code === 'Space') { if (this._seqLive) { this._seqAt = now; return true; } return false; }
+    if (!/^Key[A-Z]$/.test(code)) { this._seq = ''; this._seqLive = false; return false; }
+    if (e.repeat) return !!this._seqLive;
+    var s = this._seq = ((this._seq || '') + code.charAt(3).toLowerCase()).slice(-SEQ_MAX), n = s.length, live = false;
+    this._seqAt = now;
+    for (i = 0; i < SEQ.length; i++) {
+      if (n >= SEQ[i][0] && seqHash(s.slice(-SEQ[i][0])) === SEQ[i][1]) { this._seq = ''; this._seqLive = false; this.seqRun(i); return true; }
+    }
+    for (i = 2; i <= n && !live; i++) live = SEQ_PART[seqHash(s.slice(-i))] === 1;
+    this._seqLive = live;
+    return live;
+  };
+  U.seqRun = function (k) {
+    var app = this.app, g = this.game(), meta = app.meta, au = app.audio, n = 0;
+    if (k === 0) {
+      if (app.screen !== 'title') return;
+      n = 0x2328;
+      meta.relicCurrency += n; app.saveMeta(); this.renderTitle();
+      if (this.modalName === 'relics') this.open('relics');
+      au.unlock(); au.coin(); this.toast('🏆 트로피 토큰 +' + fmt(n), 'ok');
+      return;
+    }
+    if (app.screen !== 'game' || !g.s) return;
+    if (k === 1) {
+      F.RECIPES.forEach(function (r) { if (r.secret && meta.discovered.indexOf(r.id) < 0) { meta.discovered.push(r.id); n++; } });
+      app.saveMeta(); this.dirty = true;
+      if (this.modalName === 'craft') this.open('craft', this.modalState, true);
+      au.ui(); this.toast(n ? '✨ 비밀 조합 ' + n + '종 공개 · 조합하기의 히든 탭에서 확인' : '✨ 비밀 조합은 이미 모두 공개되어 있습니다', 'ok');
+    } else if (k === 2) {
+      if (!g.active()) return;
+      var self = this, last = null, total = 0;
+      F.PLAYERS.forEach(function (p) {
+        if (!p.hidden) return;
+        total++;
+        var slot = g.freeSlot(), u = slot >= 0 ? g.addUnit(p.id, slot) : null;
+        if (u) { n++; last = p; app.renderer.onSpawnUnit(u); self.log('히든 영입 · ' + p.name, 'ok'); }
+      });
+      if (!n) { au.error(); this.toast('빈 배치칸이 없습니다', 'err'); return; }
+      this.dirty = true; app.saveMeta(); app.saveRun();
+      au.summon(last.tier); this.showReveal(last, '✨ 히든 ' + n + '명 합류!' + (n < total ? ' (빈칸 부족)' : ''));
+    }
+  };
+
   U.bindKeys = function () {
     var self = this;
     document.addEventListener('keydown', function (e) {
-      if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
+      if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+      if (self.seqKey(e)) { e.preventDefault(); return; }
+      if (e.target && /select/i.test(e.target.tagName)) return;
       if (e.key === 'Escape') {
         if (self.modalName) { self.closeModal(); return; }
         if (self.app.screen === 'game') { if (self.selected !== null) self.select(null); else self.open('menu'); }

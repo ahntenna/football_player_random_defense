@@ -446,7 +446,7 @@
     r('garrincha', ['ronaldo_nazario', 'iniesta', 'yamal', 'raphinha', 'vinicius'], '셀레상의 후예 호나우두 · 하피냐 · 비니시우스와 드리블의 마법사 이니에스타 · 야말.'),
     r('eusebio', ['ronaldo_nazario', 'henry', 'vitinha', 'nuno_mendes', 'joao_neves'], '포르투갈의 후예 비티냐 · 누누 멘드스 · 주앙 네베스(벤피카 유스)와 골잡이 호나우두 · 앙리.'),
     // 히든 (비밀 조합)
-    r('messi', ['cruyff', 'xavi', 'lautaro', 'julian_alvarez', 'mac_allister'], '바르사의 아버지 크루이프, 황금기의 동료 사비, 2022 월드컵 우승 동료들이 GOAT를 부른다.', true),
+    r('messi', ['cruyff', 'iniesta', 'lautaro', 'julian_alvarez'], '바르사의 아버지 크루이프, 황금기의 동료 이니에스타, 2022 월드컵 우승 동료들이 GOAT를 부른다.', true),
     r('ronaldo', ['eusebio', 'zidane', 'vitinha', 'nuno_mendes'], '포르투갈의 전설 에우제비우, 레알 마드리드 감독 지단, 포르투갈 대표팀 동료들이 CR7을 부른다.', true),
     r('pele', ['garrincha', 'ronaldo_nazario', 'raphinha', 'vinicius'], '월드컵을 함께 들어 올린 가린샤와 셀레상의 후예들이 축구 황제를 부른다.', true),
     r('maradona', ['di_stefano', 'henry', 'kvaratskhelia', 'mctominay'], '아르헨티나 출신 레전드 디 스테파노, 또 하나의 "손" 사건의 앙리, "크바라도나"와 나폴리의 맥토미니가 신의 손을 부른다.', true)

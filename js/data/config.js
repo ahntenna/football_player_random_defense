@@ -8,7 +8,7 @@
   var C = F.C = {};
 
   /* 게임 버전 — 타이틀 화면에 표시한다. 게임을 수정할 때마다 올린다. */
-  F.VERSION = '1.8.0';
+  F.VERSION = '1.9.0';
 
   /* ───────── 등급 ───────── */
   C.TIERS = [
@@ -337,8 +337,9 @@
     return relic.label + ' ' + (['enemySlow', 'enemyHpDown', 'enemyArmorBreak'].indexOf(k) >= 0 ? '−' : '+') + pct(v) + '%';
   };
 
+  C.RELIC_TOKEN_BONUS = 1.3; // v1.9.0: 웨이브 클리어 토큰 획득량 +30%
   C.relicStageReward = function (wave, difficulty) {
-    var mult = (C.DIFFICULTIES[difficulty] || C.DIFFICULTIES.normal).token;
+    var mult = (C.DIFFICULTIES[difficulty] || C.DIFFICULTIES.normal).token * C.RELIC_TOKEN_BONUS;
     return Math.max(1, Math.round((15 + Math.floor(Math.max(1, wave) / 3) + (wave % 5 === 0 ? 5 : 0)) * mult));
   };
 
